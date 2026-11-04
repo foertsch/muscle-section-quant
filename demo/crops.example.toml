@@ -1,0 +1,13 @@
+# demo/make_crops.py: copy to demo/crops.local.toml (git ignores *.local.toml) and set run and sample.
+
+run = "demo/output/run"           # a finished run folder (here: the synthetic demo's)
+sample = "TA_sec1_1101_20x_treated"  # a section of that run (its samples.csv)
+
+# Optional
+# scan = "/path/to/scan.nd2"      # the scan, if it has moved since the run (default: the path in samples.csv)
+# pick = "typical"                # window at the 10th / 50th / 90th percentile of local dystrophin: lower, typical, higher
+# at = [0, 0]                     # or this window: top-left corner in full-resolution pixels (overrides pick)
+# window_um = 360                 # window width, 300 to 600 um
+# fiber = 0                       # label of the fiber for ring_sectors.png (default: a round fiber with an even ring)
+# calls = false                   # true: also write calls.png, outlines coloured by the 50% call
+# out = "demo/crops"              # where the PNGs go (git ignores it)

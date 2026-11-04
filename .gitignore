@@ -1,0 +1,25 @@
+__pycache__/
+.pytest_cache/
+.venv/
+.DS_Store
+*.egg-info/
+
+# scans and lab images never enter the repo
+*.nd2
+*.czi
+
+# local configuration (the *.example.* templates are tracked)
+*.local.toml
+*.local.env
+cluster.local.env
+
+# run output
+demo/output/
+demo/crops/
+runs/
+*.partial/
+logs/
+Rplots.pdf
+tests/regression/work/
+tests/regression/*.local.toml
+golden_out/

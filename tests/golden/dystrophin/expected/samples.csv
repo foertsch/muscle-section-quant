@@ -1,0 +1,16 @@
+sample,group,muscle,animal,section,mag,edited,note,path
+QUAD_sec1_1001_20x_ctrl,ctrl,QUAD,1001,1,20x,False,,/tmp/golden/scans/Neg-ctrl-QUAD/1001/QUAD sec1 1001 20x.nd2
+QUAD_sec1_1002_20x_ctrl,ctrl,QUAD,1002,1,20x,False,,/tmp/golden/scans/Neg-ctrl-QUAD/1002/QUAD sec1 1002 20x.nd2
+TA_sec1_1001_20x_ctrl,ctrl,TA,1001,1,20x,False,,/tmp/golden/scans/Neg-ctrl-TA/1001/TA sec1 1001 20x.nd2
+TA_sec2_1001_20x_ctrl,ctrl,TA,1001,2,20x,False,,/tmp/golden/scans/Neg-ctrl-TA/1001/TA sec2 1001 20x.nd2
+TA_sec1_1002_20x_ctrl,ctrl,TA,1002,1,20x,False,,/tmp/golden/scans/Neg-ctrl-TA/1002/TA sec1 1002 20x.nd2
+TA_sec2_1002_20x_ctrl,ctrl,TA,1002,2,20x,False,,/tmp/golden/scans/Neg-ctrl-TA/1002/TA sec2 1002 20x.nd2
+TA_sec1_1003_20x_ctrl,ctrl,TA,1003,1,20x,False,,/tmp/golden/scans/Neg-ctrl-TA/1003/TA sec1 1003 20x.nd2
+TA_sec2_1003_20x_ctrl,ctrl,TA,1003,2,20x,False,,/tmp/golden/scans/Neg-ctrl-TA/1003/TA sec2 1003 20x.nd2
+QUAD_sec1_1101_20x_treated,treated,QUAD,1101,1,20x,False,,/tmp/golden/scans/1101 QUAD/1101/QUAD sec1 1101 20x.nd2
+TA_sec1_1101_20x_treated,treated,TA,1101,1,20x,False,,/tmp/golden/scans/1101 TA/1101/TA sec1 1101 20x.nd2
+TA_sec2_1101_20x_treated,treated,TA,1101,2,20x,False,,/tmp/golden/scans/1101 TA/1101/TA sec2 1101 20x.nd2
+TA_sec1_1102_20x_treated,treated,TA,1102,1,20x,False,,/tmp/golden/scans/1102 TA/1102/TA sec1 1102 20x.nd2
+TA_sec2_1102_20x_treated,treated,TA,1102,2,20x,False,,/tmp/golden/scans/1102 TA/1102/TA sec2 1102 20x.nd2
+TA_sec1_1103_20x_treated,treated,TA,1103,1,20x,False,,/tmp/golden/scans/1103 TA/1103/TA sec1 1103 20x.nd2
+TA_sec2_1103_20x_treated,treated,TA,1103,2,20x,False,,/tmp/golden/scans/1103 TA/1103/TA sec2 1103 20x.nd2

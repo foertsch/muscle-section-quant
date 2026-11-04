@@ -1,0 +1,62 @@
+{
+  "rule": "one bar per muscle = (1 - fpr) percentile of pooled control fibers' 18th brightest ring piece; positive at level c when at least c of the 36 pieces reach the bar",
+  "fpr": 0.02,
+  "bar_coverage": 0.5,
+  "levels": [
+    "50",
+    "60",
+    "70"
+  ],
+  "muscles": {
+    "QUAD": {
+      "bar": 246.23999999999987,
+      "bar_source": "controls in this run (2 animals, 2 sections)",
+      "50": {
+        "sector_cutoff": 246.23999999999987,
+        "ctrl_fpr_pooled": 0.020202020202020204,
+        "n_ctrl_fibers": 99,
+        "loao_fpr_mean": 0.030612244897959183,
+        "loao_fpr_max": 0.061224489795918366
+      },
+      "60": {
+        "sector_cutoff": 246.23999999999987,
+        "ctrl_fpr_pooled": 0.010101010101010102,
+        "n_ctrl_fibers": 99,
+        "loao_fpr_mean": 0.01020408163265306,
+        "loao_fpr_max": 0.02040816326530612
+      },
+      "70": {
+        "sector_cutoff": 246.23999999999987,
+        "ctrl_fpr_pooled": 0.010101010101010102,
+        "n_ctrl_fibers": 99,
+        "loao_fpr_mean": 0.01020408163265306,
+        "loao_fpr_max": 0.02040816326530612
+      }
+    },
+    "TA": {
+      "bar": 260.44599999999997,
+      "bar_source": "controls in this run (3 animals, 6 sections)",
+      "50": {
+        "sector_cutoff": 260.44599999999997,
+        "ctrl_fpr_pooled": 0.023026315789473683,
+        "n_ctrl_fibers": 304,
+        "loao_fpr_mean": 0.023037597877434802,
+        "loao_fpr_max": 0.0297029702970297
+      },
+      "60": {
+        "sector_cutoff": 260.44599999999997,
+        "ctrl_fpr_pooled": 0.019736842105263157,
+        "n_ctrl_fibers": 304,
+        "loao_fpr_mean": 0.023037597877434802,
+        "loao_fpr_max": 0.0297029702970297
+      },
+      "70": {
+        "sector_cutoff": 260.44599999999997,
+        "ctrl_fpr_pooled": 0.019736842105263157,
+        "n_ctrl_fibers": 304,
+        "loao_fpr_mean": 0.019737267844431503,
+        "loao_fpr_max": 0.019801980198019802
+      }
+    }
+  }
+}

@@ -1,0 +1,52 @@
+[project]
+name = "muscle-section-quant"
+version = "0.1.0"
+description = "Whole-section quantification of mouse muscle histology in Nikon ND2 scans, starting with dystrophin per fiber"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Arion Förtsch" }]
+requires-python = ">=3.13"
+# Pinned: the golden runs in tests/golden compare every number a run writes, so the packages that make the numbers
+# change only on purpose, with the goldens checked again.
+dependencies = [
+    "cellpose==4.2.1.1",
+    "imagecodecs==2026.10.10",
+    "matplotlib==3.11.2",
+    "nd2==0.12.0",
+    "nicegui==3.18.0",
+    "numpy==2.5.4",
+    "pandas==3.0.6",
+    "pillow==12.3.0",
+    "scikit-image==0.26.0",
+    "scipy==1.18.1",
+    "tifffile==2026.10.15",
+    "torch==2.14.1",
+    "torchvision==0.29.1",
+]
+
+[project.scripts]
+msq-dystrophin = "msq.dystrophin.run_pipeline:main"
+msq-dystrophin-app = "msq.dystrophin.app:main"
+
+[dependency-groups]
+dev = ["pytest==9.1.1"]
+
+[build-system]
+requires = ["uv_build>=0.10,<0.11"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "msq"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu130", marker = "sys_platform == 'win32'" }]
+torchvision = [{ index = "pytorch-cu130", marker = "sys_platform == 'win32'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true

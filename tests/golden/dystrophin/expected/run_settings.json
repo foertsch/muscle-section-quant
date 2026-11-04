@@ -1,0 +1,147 @@
+{
+  "started": "2026-10-27T11:02:14",
+  "scans": "/tmp/golden/scans",
+  "run_folder": "/tmp/golden/run",
+  "code_version": "84d5970-dirty",
+  "software": {
+    "python": "3.13.12",
+    "cellpose": "4.2.1.1",
+    "torch": "2.14.1",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "scikit-image": "0.26.0",
+    "pandas": "3.0.6",
+    "nd2": "0.12.0"
+  },
+  "device": "synthetic golden run (no GPU)",
+  "rule": {
+    "bar_percentile_of_controls": 98.0,
+    "call_pct_of_ring": 50,
+    "levels_in_tables": [
+      50,
+      60,
+      70
+    ]
+  },
+  "scope": {
+    "muscles": [
+      "QUAD",
+      "TA"
+    ],
+    "dystrophin_channel": "GFP",
+    "actin_channel": "Cy5",
+    "magnification": "20x"
+  },
+  "reference": null,
+  "measurement_params": {
+    "downsample": 4,
+    "band_um": 1.5,
+    "core_um": 3.0,
+    "n_sectors": 36,
+    "sector_pct": 90.0,
+    "smooth_px": 1.0,
+    "min_area_um2": 50.0,
+    "max_area_um2": 15000.0,
+    "hollow_ratio": 0.8,
+    "low_actin_frac": 0.3,
+    "bright_cyto_mad": 5.0,
+    "inverted_cutoff": 150.0,
+    "tissue_margin_um": 50.0,
+    "cp_flow_threshold": 0.4,
+    "cp_cellprob_threshold": 0.0,
+    "cp_batch_size": 16
+  },
+  "cellpose_weights": null,
+  "finished": "2026-10-27T11:02:18",
+  "failed_sections": [],
+  "bars": {
+    "QUAD": {
+      "bar": 246.23999999999987,
+      "source": "controls in this run (2 animals, 2 sections)"
+    },
+    "TA": {
+      "bar": 260.44599999999997,
+      "source": "controls in this run (3 animals, 6 sections)"
+    }
+  },
+  "results": [
+    {
+      "muscle": "QUAD",
+      "group": "ctrl",
+      "animal": "1001",
+      "n_sections": 1,
+      "n_called": 50,
+      "pct_positive_50": 0.0
+    },
+    {
+      "muscle": "QUAD",
+      "group": "ctrl",
+      "animal": "1002",
+      "n_sections": 1,
+      "n_called": 49,
+      "pct_positive_50": 6.12
+    },
+    {
+      "muscle": "QUAD",
+      "group": "treated",
+      "animal": "1101",
+      "n_sections": 1,
+      "n_called": 50,
+      "pct_positive_50": 54.0
+    },
+    {
+      "muscle": "TA",
+      "group": "ctrl",
+      "animal": "1001",
+      "n_sections": 2,
+      "n_called": 101,
+      "pct_positive_50": 1.98
+    },
+    {
+      "muscle": "TA",
+      "group": "ctrl",
+      "animal": "1002",
+      "n_sections": 2,
+      "n_called": 102,
+      "pct_positive_50": 1.92
+    },
+    {
+      "muscle": "TA",
+      "group": "ctrl",
+      "animal": "1003",
+      "n_sections": 2,
+      "n_called": 101,
+      "pct_positive_50": 2.98
+    },
+    {
+      "muscle": "TA",
+      "group": "treated",
+      "animal": "1101",
+      "n_sections": 2,
+      "n_called": 102,
+      "pct_positive_50": 50.0
+    },
+    {
+      "muscle": "TA",
+      "group": "treated",
+      "animal": "1102",
+      "n_sections": 2,
+      "n_called": 100,
+      "pct_positive_50": 56.1
+    },
+    {
+      "muscle": "TA",
+      "group": "treated",
+      "animal": "1103",
+      "n_sections": 2,
+      "n_called": 107,
+      "pct_positive_50": 40.22
+    }
+  ],
+  "reports": [
+    "reports/cutoff_decision.html",
+    "reports/quad_ctrl_vs_treated.html",
+    "reports/ta_ctrl_vs_treated.html"
+  ],
+  "problems": []
+}

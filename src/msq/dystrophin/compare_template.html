@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controls vs treated</title>
+<!--ASSET base.css-->
+<!--ASSET lightbox.css-->
+<style>
+.card .note { margin-bottom: 8px; }
+.card h3 { margin: 0 0 2px; }
+.grid { display: grid; gap: 10px 12px; }
+.cols { grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
+.fwrap { overflow-x: auto; padding-bottom: 4px; }
+.fgrid { grid-template-columns: 76px repeat(var(--n), minmax(118px, 1fr)); min-width: 700px; }
+.grouphead { font-size: 12px; color: var(--ink2); border-bottom: 2px solid var(--axis); padding-bottom: 2px; }
+.grouphead.treated { border-color: var(--treated); }
+.grouphead.ctrl { border-color: var(--ctrl); }
+@media (max-width: 760px) {
+  .cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cols .grouphead { display: none; }
+}
+.colhead { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.colhead b { font-weight: 600; }
+.colsub { font-size: 12px; color: var(--ink2); font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+.rowhead { font-size: 12px; color: var(--ink2); align-self: center; line-height: 1.3; }
+.rowhead b { color: var(--ink); font-weight: 600; font-size: 13px; }
+.osw { display: block; }
+.outl path { fill: transparent; stroke: transparent; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: all; }
+.show-outlines .outl path.pos { stroke: #6da7ec; stroke-width: 2.2; }
+.show-outlines .outl path.neg { stroke: rgba(255,255,255,0.55); }
+.show-outlines .outl path.nc { stroke: #9a9890; stroke-dasharray: 4 3; }
+.show-outlines .outl path.flag { stroke: #fab219; stroke-dasharray: 4 3; }
+.outl path.hl { stroke: #fff; stroke-width: 2.6; fill: rgba(255,255,255,0.12); }
+figure { margin: 0; }
+figcaption { font-size: 12px; color: var(--ink2); margin-top: 4px; font-variant-numeric: tabular-nums; line-height: 1.35; }
+figcaption b { color: var(--ink); font-weight: 600; }
+figcaption .pos { color: var(--ink); font-weight: 600; }
+footer { margin-top: 40px; color: var(--ink2); font-size: 12px; max-width: 980px; }
+footer li { margin: 3px 0; }
+</style>
+</head>
+<body>
+<main class="page">
+  <header>
+    <h1 id="title"></h1>
+    <p class="meta" id="meta"></p>
+  </header>
+  <div class="controls">
+    <div class="ctl">Display <div class="seg" id="rangeSeg" role="group" aria-label="Display range"></div></div>
+    <div class="ctl">Calls at <div class="seg" id="levelSeg" role="group" aria-label="Stringency level"></div></div>
+    <div class="ctl">Outlines <div class="seg" id="outlineSeg" role="group" aria-label="Fiber outlines"></div></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <h2>Tissue regions</h2>
+  <p class="note" id="regionNote"></p>
+  <div class="grid cols" id="regions"></div>
+
+  <h2>Single fibers at matched percentiles</h2>
+  <p class="note" id="fiberNote"></p>
+  <div class="fwrap"><div class="grid fgrid" id="fibers"></div></div>
+
+  <h2>Distributions</h2>
+  <p class="note">Rows share one x-axis and one y-scale within each chart, so a shift to the right is brighter. Hover for the value of every animal in a bin.</p>
+  <div class="card">
+    <h3>Membrane dystrophin per fiber</h3>
+    <p class="note">Ring minus the fiber's own interior (<code>dys_membrane_specific</code>), included fibers, % of fibers per 25 a.u. bin (tallest bar <span id="maxFiber"></span>%). Black line: the section median.</p>
+    <div id="hFiber"></div>
+  </div>
+  <div class="card">
+    <h3>Fiber score against the threshold</h3>
+    <p class="note" id="scoreNote"></p>
+    <div id="hScore"></div>
+  </div>
+  <div class="card">
+    <h3>GFP pixels</h3>
+    <p class="note" id="pixelNote"></p>
+    <div id="hPixel"></div>
+  </div>
+
+  <h2>Numbers</h2>
+  <div class="card tablewrap"><table class="nums" id="numbers"></table></div>
+
+  <footer><ul id="methods"></ul></footer>
+</main>
+<!--ASSET base.js-->
+<script>
+const DATA = /*DATA*/null;
+const S = DATA.samples;
+const state = { range: "full", level: "50", outlines: "off" };
+const PIECES = { "50": 18, "60": 22, "70": 26 };
+const GROUP = g => g === "ctrl" ? "control" : "treated";
+const COLOR = g => g === "ctrl" ? "var(--ctrl)" : "var(--treated)";
+const ORD = n => n + ({ 1: "st", 2: "nd", 3: "rd" }[n % 10 * (Math.floor(n / 10) % 10 !== 1)] || "th");
+const rangeText = k => `${fmt(DATA.ranges[k][0])} to ${fmt(DATA.ranges[k][1])} a.u.`;
+
+// ---------------------------------------------------------------- header and controls
+document.title = `${DATA.muscle} controls vs treated`;
+$("#title").textContent = `${DATA.muscle}: controls and treated on one brightness scale`;
+$("#meta").textContent = `One section per animal, the one whose median membrane dystrophin is the middle of the animal's three. `
+  + `Every image is GFP minus that section's own off-tissue background, shown with the same linear range for all samples. `
+  + `${DATA.muscle} threshold: ${fmt(DATA.threshold)} a.u. Generated ${DATA.generated}.`;
+
+seg($("#rangeSeg"), [["full", `Whole range (${rangeText("full")})`], ["contrast", `Membrane contrast (${rangeText("contrast")})`]],
+  state, "range", onRange);
+seg($("#levelSeg"), DATA.levels.map(k => [k, `${k}%`]), state, "level", onLevel);
+seg($("#outlineSeg"), [["off", "Off"], ["on", "On"]], state, "outlines", onOutlines);
+$("#legend").innerHTML =
+  `<span><i class="sw" style="background:var(--ctrl)"></i>control</span>`
+  + `<span><i class="sw" style="background:var(--treated)"></i>treated</span>`
+  + [["#6da7ec", "", 2.2, "positive"], ["rgba(255,255,255,0.6)", "", 1.6, "negative"], ["#9a9890", "3 2", 1.6, "not counted"]]
+    .map(([c, dash, w, label]) => `<span><svg class="osw" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">`
+      + `<rect width="16" height="16" rx="3" fill="#000"/><rect x="3" y="3" width="10" height="10" rx="3" fill="none" stroke="${c}" `
+      + `stroke-width="${w}" stroke-dasharray="${dash}"/></svg>${label}</span>`).join("");
+
+function callOf(c, k) { return c.status !== "included" ? null : (c["c" + k] || null); }
+function outlineClass(c) {
+  if (c.status === "flagged") return "flag";
+  const call = callOf(c, state.level);
+  return call === "positive" ? "pos" : call === "negative" ? "neg" : "nc";
+}
+function fiberTip(s, c) {
+  const k = state.level;
+  const status = c.status === "included" ? "" : ` <span class="muted">(not counted: ${c.status === "flagged" ? "bright cytoplasm" : "excluded"})</span>`;
+  const calls = DATA.levels.map(l => callOf(c, l) || "n/a").join(" / ");
+  return `<b>Fiber ${c.label}</b> <span class="muted">${s.animal} ${GROUP(s.group)}, sec${s.section}</span>${status}<table>`
+    + `<tr><td>membrane dystrophin</td><td>${fmt(c.dys)} a.u.</td></tr>`
+    + `<tr><td>score at ${k}% (${ORD(PIECES[k])} piece)</td><td>${fmt(c["s" + k])}</td></tr>`
+    + `<tr><td>call at ${DATA.levels.join(" / ")}%</td><td>${calls}</td></tr>`
+    + `<tr><td>area</td><td>${fmt(c.area)} µm²</td></tr></table>`;
+}
+
+// ---------------------------------------------------------------- images
+const outlinePaths = [];   // {el, c} for re-classing on level change
+const levelTexts = [];     // functions re-run on level change
+
+function imgBox(img, size, um, cells, barUm, alt) {
+  const box = document.createElement("div");
+  box.className = "imgbox zoomable";
+  const im = document.createElement("img");
+  im.alt = alt; im.width = size; im.height = size;
+  im.dataset.full = img.full; im.dataset.contrast = img.contrast; im.src = img[state.range];
+  box.appendChild(im);
+  const len = barUm * size / um, fs = size * 0.05, sw = size * 0.008;
+  const x0 = size * 0.04, y0 = size * 0.94;
+  box.insertAdjacentHTML("beforeend",
+    `<svg viewBox="0 0 ${size} ${size}" preserveAspectRatio="none" aria-hidden="true"><g class="outl">`
+    + cells.map((c, i) => `<path data-i="${i}" class="${outlineClass(c)}" d="${c.path}"/>`).join("")
+    + `</g><g class="sbar"><line x1="${x0}" x2="${x0 + len}" y1="${y0}" y2="${y0}" stroke-width="${sw}"/>`
+    + `<text x="${x0}" y="${y0 - sw * 2}" font-size="${fs}" stroke-width="${fs * 0.15}">${barUm} µm</text></g></svg>`);
+  box.querySelectorAll(".outl path").forEach(p => outlinePaths.push({ el: p, c: cells[+p.dataset.i] }));
+  return box;
+}
+
+function bindFiberHover(box, s, cells) {
+  box.querySelectorAll(".outl path").forEach(p => {
+    const c = cells[+p.dataset.i];
+    p.addEventListener("mouseenter", e => { p.classList.add("hl"); tip.show(fiberTip(s, c), e); });
+    p.addEventListener("mousemove", tip.move);
+    p.addEventListener("mouseleave", () => { p.classList.remove("hl"); tip.hide(); });
+  });
+}
+
+function openZoom(box, title, s, cells) {
+  const clone = box.cloneNode(true);
+  clone.querySelectorAll(".hl").forEach(el => el.classList.remove("hl"));
+  if (cells) bindFiberHover(clone, s, cells);
+  lightbox(title, clone);
+}
+
+function groupHeads(host, lead) {
+  // one header per run of same-group columns (controls, then treated)
+  let i = 0;
+  if (lead) host.appendChild(document.createElement("div"));
+  while (i < S.length) {
+    let j = i;
+    while (j < S.length && S[j].group === S[i].group) j++;
+    const d = document.createElement("div");
+    d.className = `grouphead ${S[i].group}`;
+    d.style.gridColumn = `span ${j - i}`;
+    d.textContent = S[i].group === "ctrl" ? "Controls (untreated mdx)" : "Treated";
+    host.appendChild(d);
+    i = j;
+  }
+}
+function colHead(s) {
+  return `<div class="colhead"><i class="sw" style="background:${COLOR(s.group)}"></i><b>${s.animal}</b> ${GROUP(s.group)} <span class="muted">sec${s.section}</span></div>`;
+}
+
+function renderRegions() {
+  const host = $("#regions");
+  host.style.setProperty("--n", S.length);
+  groupHeads(host, false);
+  $("#regionNote").textContent = `${DATA.region_um} µm windows, one per section: of all windows densely covered by included, in-focus fibers, `
+    + `the one whose local median membrane dystrophin is closest to the section median. Click an image to enlarge it; hover a fiber for its values.`;
+  for (const s of S) {
+    const col = document.createElement("div");
+    col.innerHTML = colHead(s);
+    const sub = document.createElement("div");
+    sub.className = "colsub";
+    const upd = () => sub.innerHTML = `background ${fmt(s.bg)} · median ${fmt(s.dys_median)} a.u.<br>`
+      + `${fmt(s["pct_positive_" + state.level], 1)}% of fibers positive at ${state.level}%`;
+    upd(); levelTexts.push(upd);
+    col.appendChild(sub);
+    const r = s.region;
+    const box = imgBox(r.img, r.size, DATA.region_um, r.cells, 100, `${s.animal} ${GROUP(s.group)} region`);
+    bindFiberHover(box, s, r.cells);
+    box.addEventListener("click", () => openZoom(box, `${s.animal} ${GROUP(s.group)}, sec${s.section}: ${DATA.region_um} µm region`, s, r.cells));
+    col.appendChild(box);
+    host.appendChild(col);
+  }
+}
+
+function renderFibers() {
+  const host = $("#fibers");
+  host.style.setProperty("--n", S.length);
+  $("#fiberNote").textContent = `For each percentile of a section's membrane dystrophin, the mid-sized fiber (800 to 3,500 µm²) `
+    + `with the closest value, centred in a ${DATA.closeup_um} µm close-up. Same display range as above. `
+    + `Captions: membrane dystrophin, score at the chosen level, call.`;
+  groupHeads(host, true);
+  host.appendChild(document.createElement("div"));
+  for (const s of S) host.insertAdjacentHTML("beforeend", colHead(s));
+  DATA.quantiles.forEach((q, qi) => {
+    host.insertAdjacentHTML("beforeend", `<div class="rowhead"><b>${ORD(q)}</b><br>percentile</div>`);
+    for (const s of S) {
+      const c = s.closeups[qi];
+      const fig = document.createElement("figure");
+      const box = imgBox(c.img, c.size, DATA.closeup_um, [c], 20, `${s.animal} fiber at the ${ORD(q)} percentile`);
+      box.addEventListener("mouseenter", e => tip.show(fiberTip(s, c), e));
+      box.addEventListener("mousemove", tip.move);
+      box.addEventListener("mouseleave", tip.hide);
+      box.addEventListener("click", () => openZoom(box, `${s.animal} ${GROUP(s.group)}: fiber ${c.label}, ${ORD(q)} percentile`, null, null));
+      fig.appendChild(box);
+      const cap = document.createElement("figcaption");
+      const upd = () => {
+        const call = callOf(c, state.level) || "not counted";
+        cap.innerHTML = `<b>${fmt(c.dys)}</b> a.u. · score ${fmt(c["s" + state.level])} · `
+          + (call === "positive" ? `<span class="pos">positive</span>` : call);
+      };
+      upd(); levelTexts.push(upd);
+      fig.appendChild(cap);
+      host.appendChild(fig);
+    }
+  });
+}
+
+// ---------------------------------------------------------------- histograms
+const histRow = (s, a, more) => ({ name: [s.animal, GROUP(s.group)], sub: `sec${s.section}`, color: COLOR(s.group), a, ...more });
+
+function drawFiberHist() {
+  const h = DATA.hist.fiber;
+  rowHist($("#hFiber"), {
+    edges: h.edges, dec: 1, aria: "Histograms of membrane dystrophin per fiber, one row per animal",
+    rows: S.map(s => histRow(s, h.rows[s.sample], { marker: s.dys_median,
+                 stat: [`median ${fmt(s.dys_median)}`, `${fmt(s.n_included)} fibers`] })),
+    onScale: m => $("#maxFiber").textContent = fmt(m, 1),
+  });
+}
+function drawScoreHist() {
+  const h = DATA.hist.score, k = state.level;
+  $("#scoreNote").textContent = `Each fiber's score at ${k}%: its ${ORD(PIECES[k])} brightest of 36 ring pieces. `
+    + `A fiber is positive when the score reaches the ${DATA.muscle} threshold (${fmt(DATA.threshold)} a.u., dashed; control animals: the threshold from the other control animals), i.e. at least `
+    + `${PIECES[k]} pieces reach it. Called fibers, % per 25 a.u. bin. Change the level with "Calls at" above.`;
+  rowHist($("#hScore"), {
+    edges: h.edges, dec: 1, vline: { x: DATA.threshold, label: `threshold ${fmt(DATA.threshold)}` },
+    aria: `Histograms of fiber scores at ${k}% against the threshold, one row per animal`,
+    rows: S.map(s => histRow(s, h.rows[s.sample][k],
+                 { stat: [`${fmt(s["pct_positive_" + k], 1)}% positive`, `${fmt(s.n_called)} called`] })),
+  });
+}
+function drawPixelHist() {
+  const h = DATA.hist.pixel, rg = DATA.ranges[state.range];
+  $("#pixelNote").innerHTML = `Single GFP pixels minus the section's background. Bars: pixels in the main section; `
+    + `grey line: empty slide more than 50 µm from tissue, whose narrow peak at 0 is cut off at the row top. `
+    + `% of pixels per 25 a.u. bin, same scale in every row (tallest bar <span id="maxPixel"></span>%). Black line: tissue median. `
+    + `The strip shows the grey each value gets in the images at the current display range (${rangeText(state.range)}).`;
+  rowHist($("#hPixel"), {
+    edges: h.edges, dec: 2, strip: rg, onScale: m => $("#maxPixel").textContent = fmt(m, 2),
+    aria: "Histograms of GFP pixel intensities, tissue and off-tissue, one row per animal",
+    rows: S.map(s => histRow(s, h.rows[s.sample].tissue, { b: h.rows[s.sample].off, marker: s.tissue_px_median,
+                 stat: [`median ${fmt(s.tissue_px_median)}`, `background ${fmt(s.bg)}`] })),
+  });
+}
+
+// ---------------------------------------------------------------- table and methods
+function renderTable() {
+  const L = DATA.levels;
+  const head = `<tr><th>Animal</th><th>Group</th><th>Section</th><th>Background<br>(raw a.u.)</th><th>Fibers<br>included</th>`
+    + `<th>Membrane dystrophin<br>median</th><th>10th / 90th<br>percentile</th><th>Ring, no interior<br>subtraction</th>`
+    + `<th>Fiber interior<br>GFP</th><th>Score median<br>at ${L.join(" / ")}%</th><th>% positive<br>at ${L.join(" / ")}%</th>`
+    + `<th>Tissue pixel<br>median</th><th>Off-tissue noise<br>(robust SD)</th></tr>`;
+  const body = S.map(s => `<tr><td><b>${s.animal}</b></td><td>${GROUP(s.group)}</td><td>sec${s.section}</td><td>${fmt(s.bg)}</td>`
+    + `<td>${fmt(s.n_included)}</td><td>${fmt(s.dys_median)}</td><td>${fmt(s.dys_p10)} / ${fmt(s.dys_p90)}</td>`
+    + `<td>${fmt(s.ridge_median)}</td><td>${fmt(s.cyto_median)}</td>`
+    + `<td>${L.map(k => fmt(s["score_median_" + k])).join(" / ")}</td>`
+    + `<td>${L.map(k => fmt(s["pct_positive_" + k], 1)).join(" / ")}</td>`
+    + `<td>${fmt(s.tissue_px_median)}</td><td>${fmt(s.off_px_sd)}</td></tr>`).join("");
+  $("#numbers").innerHTML = `<thead>${head}</thead><tbody>${body}</tbody>`;
+}
+
+function renderMethods() {
+  const [fl, fh] = DATA.ranges.full, [cl, ch] = DATA.ranges.contrast;
+  const items = [
+    `All values are a.u. after subtracting the section's off-tissue background, except the raw background column.`,
+    `Whole range: black at the background (${fmt(fl)}), white at the 99th percentile of membrane ridge over all included fibers of these sections (${fmt(fh)}).`,
+    `Membrane contrast: black at the 25th percentile of fiber interior GFP (${fmt(cl)}), white at the 95th percentile of membrane ridge (${fmt(ch)}). Both ranges are linear and identical for every image.`,
+    `Positive calls use one threshold per muscle (${DATA.threshold_percentile}th percentile of pooled control fibers' 50% score): a fiber is positive when 50% of its ring pieces reach the threshold. 60 and 70% are stricter levels against the same threshold; see GLOSSARY.md. Control animals are called against the threshold from the other control animals (held out), so their % positive is what an unseen control animal would give; the dashed line is the threshold from all controls, which the treated are called against.`,
+    `Pixel histograms sample one native pixel per 4 x 4 block (no averaging, so pixel noise is kept). Tissue is the main section; off-tissue is slide more than 50 µm from tissue.`,
+  ];
+  $("#methods").innerHTML = items.map(t => `<li>${t}</li>`).join("");
+}
+
+// ---------------------------------------------------------------- state changes
+function onRange() {
+  document.querySelectorAll("img[data-full]").forEach(im => im.src = im.dataset[state.range]);
+  drawPixelHist();
+}
+function onLevel() {
+  for (const { el, c } of outlinePaths) el.setAttribute("class", outlineClass(c));
+  for (const f of levelTexts) f();
+  drawScoreHist();
+}
+function onOutlines() { document.body.classList.toggle("show-outlines", state.outlines === "on"); }
+function drawCharts() { drawFiberHist(); drawScoreHist(); drawPixelHist(); }
+
+renderRegions();
+renderFibers();
+renderTable();
+renderMethods();
+drawCharts();
+let rt;
+addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(drawCharts, 120); });
+</script>
+</body>
+</html>

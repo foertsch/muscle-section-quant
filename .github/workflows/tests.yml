@@ -1,0 +1,21 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.2"
+      - name: Install
+        run: uv sync --frozen
+      - name: Tests (synthetic data; no Cellpose weights, no GPU)
+        run: uv run pytest -q
+      - name: Demo
+        run: uv run python demo/run_demo.py

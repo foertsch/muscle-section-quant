@@ -1,0 +1,35 @@
+{
+  "source": "/tmp/golden/scans/Neg-ctrl-QUAD/1001/QUAD sec1 1001 20x.nd2",
+  "source_size": 0,
+  "channels": [
+    "DAPI",
+    "GFP",
+    "Cy5"
+  ],
+  "pixel_size_um": 0.3606,
+  "saturation_level": 16383,
+  "background_gfp": 500.0,
+  "background_actin": 500.0,
+  "bright_cytoplasm_cutoff_bgsub": 1993.233,
+  "n_objects": 57,
+  "n_included": 50,
+  "params": {
+    "downsample": 4,
+    "band_um": 1.5,
+    "core_um": 3.0,
+    "n_sectors": 36,
+    "sector_pct": 90.0,
+    "smooth_px": 1.0,
+    "min_area_um2": 50.0,
+    "max_area_um2": 15000.0,
+    "hollow_ratio": 0.8,
+    "low_actin_frac": 0.3,
+    "bright_cyto_mad": 5.0,
+    "inverted_cutoff": 150.0,
+    "tissue_margin_um": 50.0,
+    "cp_flow_threshold": 0.4,
+    "cp_cellprob_threshold": 0.0,
+    "cp_batch_size": 16
+  },
+  "runtime_s": 0.1
+}

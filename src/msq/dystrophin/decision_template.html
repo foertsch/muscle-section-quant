@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Threshold decision</title>
+<!--ASSET base.css-->
+<!--ASSET lightbox.css-->
+<style>
+.slider { display: flex; align-items: center; gap: 8px; }
+.slider input { width: 220px; }
+.readout { min-width: 230px; }
+.osw { display: block; }
+.summary { margin: 14px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); font-size: 14px; }
+.summary b { font-variant-numeric: tabular-nums; }
+table.nums tr.pooled td { color: var(--ink2); border-top: 2px solid var(--axis); }
+svg.chart .cross { stroke: var(--muted); stroke-width: 1; }
+svg.chart .line { fill: none; stroke-width: 2; stroke-linejoin: round; }
+.grid5 { display: grid; gap: 10px 12px; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
+@media (max-width: 760px) { .grid5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.colhead { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.colhead b { font-weight: 600; }
+.secthead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+.secthead .ctl { margin: 32px 0 4px; }
+.colsub { font-size: 12px; color: var(--ink2); font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+.ovbox { position: relative; background: #000; border-radius: 6px; overflow: hidden; cursor: zoom-in; }
+.ovbox img { display: block; width: 100%; height: auto; }
+.ovbox canvas, .ovbox svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ovbox canvas, .ovbox .ovmark { display: none; }
+.show-outlines .ovbox canvas, .show-outlines .ovbox .ovmark { display: block; }
+dialog .ovbox { cursor: default; }
+.outl path { fill: transparent; stroke: transparent; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: all; }
+.show-outlines .outl path.pos { stroke: #6da7ec; stroke-width: 2.2; }
+.show-outlines .outl path.neg { stroke: rgba(255,255,255,0.55); }
+.show-outlines .outl path.nc { stroke: #9a9890; stroke-dasharray: 4 3; }
+.show-outlines .outl path.flag { stroke: #fab219; stroke-dasharray: 4 3; }
+.outl path.hl { stroke: #fff; stroke-width: 2.6; fill: rgba(255,255,255,0.12); }
+/* close-ups: thin dashed outline, so the membrane under it stays visible */
+.show-outlines .tile .outl path.pos, .show-outlines .tile .outl path.neg { stroke-width: 1.2; stroke-dasharray: 3 4; }
+.bwrap { overflow-x: auto; }
+.bgrid { display: grid; grid-template-columns: 96px repeat(3, minmax(110px, 1fr)) 18px repeat(3, minmax(110px, 1fr)); gap: 10px 10px; min-width: 820px; align-items: start; }
+.bgrid .side { font-size: 12px; color: var(--ink2); border-bottom: 2px solid var(--axis); padding-bottom: 2px; }
+.bgrid .side.above { border-color: #6da7ec; }
+.bgrid .divider { align-self: stretch; border-left: 2px dashed var(--ink2); margin-left: 8px; }
+.rowhead { font-size: 12px; color: var(--ink2); align-self: center; line-height: 1.35; }
+.rowhead b { color: var(--ink); font-weight: 600; font-size: 13px; }
+.empty { font-size: 12px; color: var(--muted); align-self: center; text-align: center; }
+figure { margin: 0; }
+figcaption { font-size: 12px; color: var(--ink2); margin-top: 3px; font-variant-numeric: tabular-nums; line-height: 1.3; }
+figcaption b { color: var(--ink); font-weight: 600; }
+footer { margin-top: 40px; color: var(--ink2); font-size: 12px; max-width: 1000px; }
+footer li { margin: 3px 0; }
+</style>
+</head>
+<body class="show-outlines">
+<main class="page">
+  <header>
+    <h1>Threshold decision: dystrophin-positive fibers</h1>
+    <p class="meta" id="meta"></p>
+  </header>
+  <div class="controls">
+    <div class="ctl">Muscle <div class="seg" id="muscleSeg" role="group" aria-label="Muscle"></div></div>
+    <div class="ctl slider">Threshold
+      <input type="range" id="pSlider" aria-label="Control percentile that sets the threshold">
+      <span class="readout" id="readout"></span>
+      <div class="seg" id="presetSeg" role="group" aria-label="Preset percentiles"></div>
+    </div>
+    <div class="ctl">Ring required <div class="seg" id="levelSeg" role="group" aria-label="Share of the ring required"></div></div>
+    <div class="ctl">Display <div class="seg" id="rangeSeg" role="group" aria-label="Display range"></div></div>
+    <div class="ctl">Outlines <div class="seg" id="outlineSeg" role="group" aria-label="Fiber outlines"></div></div>
+    <div class="legend" id="legend"></div>
+  </div>
+  <p class="summary" id="summary"></p>
+
+  <h2>Numbers</h2>
+  <p class="note">% positive = positive fibers / called fibers, mean of the animal's sections, against the threshold set here (the summary calls control animals against the threshold from the other control animals: the held-out column at the summary's percentile). The highlighted column is the ring share chosen above. Treated minus control subtracts the pooled control fibers' %. Held-out: each control animal scored with a threshold set from the other control animals at the same percentile.</p>
+  <div class="card tablewrap"><table class="nums" id="numbers"></table></div>
+
+  <h2>How the numbers move with the threshold</h2>
+  <p class="note" id="curveNote"></p>
+  <div class="card"><div id="curve"></div></div>
+
+  <h2>Fiber scores against the threshold</h2>
+  <p class="note" id="histNote"></p>
+  <div class="card"><div id="hist"></div></div>
+
+  <div class="secthead">
+    <h2>Whole sections</h2>
+    <div class="ctl"><div class="seg" id="outlineSeg2" role="group" aria-label="Fiber marks and outlines on the images"></div></div>
+  </div>
+  <p class="note" id="ovNote"></p>
+  <div id="overviews"></div>
+
+  <h2>Tissue regions</h2>
+  <p class="note" id="regionNote"></p>
+  <div id="regions"></div>
+
+  <h2>Fibers at the threshold</h2>
+  <p class="note" id="borderNote"></p>
+  <div id="borders"></div>
+
+  <footer><ul id="methods"></ul></footer>
+</main>
+<!--ASSET base.js-->
+<script>
+const DATA = /*DATA*/null;
+const LV = DATA.levels;
+const PIECES = { "50": 18, "60": 22, "70": 26 };
+const state = { muscle: DATA.order[0], p: DATA.default_p, level: "50", range: "full", outlines: "on" };
+const GROUP = g => g === "ctrl" ? "control" : "treated";
+const COLOR = g => g === "ctrl" ? "var(--ctrl)" : "var(--treated)";
+const ORD = n => { const r = Math.round(n * 10) / 10, i = Math.floor(r);
+  const suf = Number.isInteger(r) ? ({ 1: "st", 2: "nd", 3: "rd" }[i % 10 * (Math.floor(i / 10) % 10 !== 1)] || "th") : "th";
+  return (Number.isInteger(r) ? r : r.toFixed(1)) + suf; };
+const signed = (v, d = 1) => (v >= 0 ? "+" : "−") + fmt(Math.abs(v), d);
+
+// ---------------------------------------------------------------- data
+function decode(d) {
+  const a = new Float64Array(d.length);
+  let acc = 0;
+  for (let i = 0; i < d.length; i++) { acc += d[i]; a[i] = acc / 10; }
+  return a;
+}
+function merge(arrs) {
+  let n = 0;
+  for (const a of arrs) n += a.length;
+  const out = new Float64Array(n);
+  let o = 0;
+  for (const a of arrs) { out.set(a, o); o += a.length; }
+  return out.sort();
+}
+for (const M of Object.values(DATA.muscles)) {
+  for (const s of M.sections) for (const k of LV) { s[k] = decode(s["d" + k]); delete s["d" + k]; }
+  const ctrl = M.sections.filter(s => s.group === "ctrl");
+  M.ctrl50 = merge(ctrl.map(s => s["50"]));
+  M.ctrlPooled = Object.fromEntries(LV.map(k => [k, merge(ctrl.map(s => s[k]))]));
+  M.heldOut = {};
+  for (const a of new Set(ctrl.map(s => s.animal))) {
+    M.heldOut[a] = {
+      others50: merge(ctrl.filter(s => s.animal !== a).map(s => s["50"])),
+      own: Object.fromEntries(LV.map(k => [k, merge(ctrl.filter(s => s.animal === a).map(s => s[k]))])),
+    };
+  }
+  for (const a of M.animals) a.sections = M.sections.filter(s => s.animal === a.animal);
+}
+const M = () => DATA.muscles[state.muscle];
+
+function animalPct(m, threshold, k) {
+  return Object.fromEntries(m.animals.map(a => [a.animal,
+    a.sections.reduce((t, s) => t + 100 * countGE(s[k], threshold) / s.n, 0) / a.sections.length]));
+}
+function compute(m, p) {
+  const threshold = pctl(m.ctrl50, p);
+  const pct = Object.fromEntries(LV.map(k => [k, animalPct(m, threshold, k)]));
+  const ctrlPct = Object.fromEntries(LV.map(k => [k, 100 * countGE(m.ctrlPooled[k], threshold) / m.ctrlPooled[k].length]));
+  const held = {};
+  for (const [a, h] of Object.entries(m.heldOut)) {
+    const b = pctl(h.others50, p);
+    held[a] = { threshold: b, fp: Object.fromEntries(LV.map(k => [k, 100 * countGE(h.own[k], b) / h.own[k].length])) };
+  }
+  return { threshold, pct, ctrlPct, held };
+}
+
+let R = null;   // current computation for the active muscle
+function callAt(c, k, threshold) {
+  if (c.status !== "included" || c["s" + k] == null) return null;
+  return c["s" + k] >= threshold ? "positive" : "negative";
+}
+function outlineClass(c) {
+  if (c.status === "flagged") return "flag";
+  const call = callAt(c, state.level, R.threshold);
+  return call === "positive" ? "pos" : call === "negative" ? "neg" : "nc";
+}
+function fiberTip(a, c, section) {
+  const note = c.status === "included" ? "" : ` <span class="muted">(not counted: ${c.status === "flagged" ? "bright cytoplasm" : "excluded"})</span>`;
+  return `<b>Fiber ${c.label}</b> <span class="muted">${a.animal} ${GROUP(a.group)}, sec${section}</span>${note}<table>`
+    + `<tr><td>membrane dystrophin</td><td>${fmt(c.dys)} a.u.</td></tr>`
+    + `<tr><td>score at ${LV.join(" / ")}%</td><td>${LV.map(k => fmt(c["s" + k])).join(" / ")}</td></tr>`
+    + `<tr><td>call at threshold ${fmt(R.threshold)}</td><td>${LV.map(k => callAt(c, k, R.threshold) || "n/a").join(" / ")}</td></tr>`
+    + `<tr><td>area</td><td>${fmt(c.area)} µm²</td></tr></table>`;
+}
+
+// ---------------------------------------------------------------- images (canvas, so the display range is remapped in the page)
+const canvases = [];
+function lut(m) {
+  const L = new Uint8ClampedArray(256), hiFull = m.ranges.full[1], [lo, hi] = m.ranges[state.range];
+  for (let v = 0; v < 256; v++) L[v] = Math.round(Math.min(1, Math.max(0, (v / 255 * hiFull - lo) / (hi - lo))) * 255);
+  return L;
+}
+function paint(rec) {
+  if (!rec.grey) return;
+  const ctx = rec.cv.getContext("2d"), img = ctx.createImageData(rec.cv.width, rec.cv.height), d = img.data, L = lut(rec.m);
+  for (let i = 0, j = 0; j < rec.grey.length; i += 4, j++) { const v = L[rec.grey[j]]; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+  ctx.putImageData(img, 0, 0);
+}
+function makeCanvas(src, m) {
+  const cv = document.createElement("canvas"), rec = { cv, m, grey: null };
+  const im = new Image();
+  im.onload = () => {
+    cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+    const ctx = cv.getContext("2d");
+    ctx.drawImage(im, 0, 0);
+    const d = ctx.getImageData(0, 0, cv.width, cv.height).data, g = new Uint8Array(cv.width * cv.height);
+    for (let i = 0, j = 0; j < g.length; i += 4, j++) g[j] = d[i];
+    rec.grey = g;
+    paint(rec);
+  };
+  im.src = src;
+  canvases.push(rec);
+  return cv;
+}
+
+const outlinePaths = [];   // {el, c, muscle}
+function imgBox(m, img, size, um, cells, barUm, extraClass) {
+  const box = document.createElement("div");
+  box.className = "imgbox" + (extraClass ? " " + extraClass : "");
+  box.appendChild(makeCanvas(img, m));
+  const len = barUm * size / um, fs = size * 0.05, sw = size * 0.008, x0 = size * 0.04, y0 = size * 0.94;
+  box.insertAdjacentHTML("beforeend",
+    `<svg viewBox="0 0 ${size} ${size}" preserveAspectRatio="none" aria-hidden="true"><g class="outl">`
+    + cells.map((c, i) => `<path data-i="${i}" d="${c.path}"/>`).join("")
+    + `</g><g class="sbar"><line x1="${x0}" x2="${x0 + len}" y1="${y0}" y2="${y0}" stroke-width="${sw}"/>`
+    + `<text x="${x0}" y="${y0 - sw * 2}" font-size="${fs}" stroke-width="${fs * 0.15}">${barUm} µm</text></g></svg>`);
+  box.querySelectorAll(".outl path").forEach(p => outlinePaths.push({ el: p, c: cells[+p.dataset.i], muscle: m.muscle }));
+  return box;
+}
+function bindFiberHover(box, a, cells, section) {
+  box.querySelectorAll(".outl path").forEach(p => {
+    const c = cells[+p.dataset.i];
+    p.addEventListener("mouseenter", e => { p.classList.add("hl"); tip.show(fiberTip(a, c, section), e); });
+    p.addEventListener("mousemove", tip.move);
+    p.addEventListener("mouseleave", () => { p.classList.remove("hl"); tip.hide(); });
+  });
+}
+
+function openZoom(box, title, a, cells, section) {
+  const clone = box.cloneNode(true);
+  clone.classList.remove("zoomable");
+  clone.querySelectorAll(".hl").forEach(el => el.classList.remove("hl"));
+  const src = box.querySelector("canvas"), cv = clone.querySelector("canvas");
+  cv.width = src.width; cv.height = src.height;
+  cv.getContext("2d").drawImage(src, 0, 0);
+  bindFiberHover(clone, a, cells, section);
+  lightbox(title, clone);
+}
+
+function colHead(a) {
+  return `<div class="colhead"><i class="sw" style="background:${COLOR(a.group)}"></i><b>${a.animal}</b> ${GROUP(a.group)} <span class="muted">sec${a.section}</span></div>`;
+}
+
+// ---------------------------------------------------------------- whole sections
+// positive fibers as dots on a canvas over the overview; dot size follows the displayed width, so dots stay
+// about 1.6 screen pixels across in the column and in the enlarged view
+function drawDots(o, cv, shownW) {
+  const ctx = cv.getContext("2d"), s = o["f" + state.level], r = Math.max(1.2, 1.6 * o.w / Math.max(1, shownW));
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = "rgba(109,167,236,0.9)";
+  ctx.beginPath();
+  let n = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] == null || s[i] / 10 < R.threshold) continue;
+    ctx.moveTo(o.fx[i] + r, o.fy[i]);
+    ctx.arc(o.fx[i], o.fy[i], r, 0, 2 * Math.PI);
+    n++;
+  }
+  ctx.fill();
+  return n;
+}
+const ovRecs = [];   // {a, m, o, box, cv, sub}
+for (const m of Object.values(DATA.muscles)) {
+  const pane = document.createElement("div");
+  pane.className = "grid5"; pane.dataset.m = m.muscle; pane.style.setProperty("--n", m.animals.length);
+  for (const a of m.animals) {
+    const o = a.overview, col = document.createElement("div");
+    col.innerHTML = colHead(a);
+    const sub = document.createElement("div");
+    sub.className = "colsub";
+    col.appendChild(sub);
+    const box = document.createElement("div");
+    box.className = "ovbox";
+    box.innerHTML = `<img src="${o.img}" width="${o.w}" height="${o.h}" alt="Whole section, ${m.muscle} ${a.animal} sec${a.section}, dystrophin">`;
+    const cv = document.createElement("canvas");
+    cv.width = o.w; cv.height = o.h;
+    box.appendChild(cv);
+    const mm = 1000 / o.px_um, u = o.w / 100, y = o.h - 5 * u;
+    box.insertAdjacentHTML("beforeend", `<svg viewBox="0 0 ${o.w} ${o.h}" preserveAspectRatio="none" aria-hidden="true">`
+      + `<rect class="ovmark" x="${o.box[0]}" y="${o.box[1]}" width="${o.box[2]}" height="${o.box[2]}" fill="none" stroke="#f0efec" stroke-width="2" vector-effect="non-scaling-stroke"/>`
+      + `<g class="sbar"><line x1="${4 * u}" x2="${4 * u + mm}" y1="${y}" y2="${y}" stroke-width="${0.7 * u}"/>`
+      + `<text x="${4 * u}" y="${y - 1.4 * u}" font-size="${3.6 * u}" stroke-width="${0.5 * u}">1 mm</text></g></svg>`);
+    const rec = { a, m, o, box, cv, sub };
+    box.addEventListener("click", () => openOvZoom(rec));
+    col.appendChild(box);
+    pane.appendChild(col);
+    ovRecs.push(rec);
+  }
+  $("#overviews").appendChild(pane);
+}
+function updateOverviews(m) {
+  const k = state.level;
+  for (const r of ovRecs) if (r.m === m) {
+    const n = drawDots(r.o, r.cv, r.box.clientWidth), s = r.a.sections.find(x => x.section === r.a.section);
+    r.sub.textContent = `${fmt(n)} of ${fmt(s.n)} fibers positive at ${k}% (${fmt(100 * n / s.n, 1)}%)`;
+  }
+}
+function openOvZoom(r) {
+  const clone = r.box.cloneNode(true);
+  clone.style.width = `min(88vw, calc((96vh - 70px) * ${r.o.w / r.o.h}))`;
+  lightbox(`${r.m.muscle} ${r.a.animal} ${GROUP(r.a.group)}, sec${r.a.section}: whole section, `
+    + `fibers positive at ${state.level}% and threshold ${fmt(R.threshold)} marked`, clone);
+  drawDots(r.o, clone.querySelector("canvas"), clone.clientWidth);
+}
+
+// ---------------------------------------------------------------- build static parts per muscle
+const regionSubs = [];   // {el, a, muscle}
+const borderRows = [];   // {a, muscle, below: [slots], above: [slots], tiles}
+for (const m of Object.values(DATA.muscles)) {
+  const pane = document.createElement("div");
+  pane.className = "grid5"; pane.dataset.m = m.muscle; pane.style.setProperty("--n", m.animals.length);
+  for (const a of m.animals) {
+    const col = document.createElement("div");
+    col.innerHTML = colHead(a);
+    const sub = document.createElement("div");
+    sub.className = "colsub";
+    col.appendChild(sub);
+    regionSubs.push({ el: sub, a, muscle: m.muscle });
+    const r = a.region;
+    const box = imgBox(m, r.img, r.size, m.region_um, r.cells, 100, "zoomable");
+    bindFiberHover(box, a, r.cells, a.section);
+    box.addEventListener("click", () => openZoom(box, `${m.muscle} ${a.animal} ${GROUP(a.group)}, sec${a.section}: ${m.region_um} µm region`, a, r.cells, a.section));
+    col.appendChild(box);
+    pane.appendChild(col);
+  }
+  $("#regions").appendChild(pane);
+
+  const wrap = document.createElement("div");
+  wrap.className = "bwrap"; wrap.dataset.m = m.muscle;
+  const grid = document.createElement("div");
+  grid.className = "bgrid";
+  grid.innerHTML = `<div></div><div class="side" style="grid-column: span 3">Just below the threshold: negative (nearest on the right)</div><div></div>`
+    + `<div class="side above" style="grid-column: span 3">Just above the threshold: positive (nearest on the left)</div>`;
+  for (const a of m.animals) {
+    grid.insertAdjacentHTML("beforeend", `<div class="rowhead"><b>${a.animal}</b><br>${GROUP(a.group)}<br>sec${a.section}</div>`);
+    const tiles = a.pool.map(c => {
+      const fig = document.createElement("figure");
+      const box = imgBox(m, c.img, c.size, m.closeup_um, [c], 20, "tile");
+      box.addEventListener("mouseenter", e => tip.show(fiberTip(a, c, a.section), e));
+      box.addEventListener("mousemove", tip.move);
+      box.addEventListener("mouseleave", tip.hide);
+      fig.appendChild(box);
+      const cap = document.createElement("figcaption");
+      fig.appendChild(cap);
+      return { fig, cap, c };
+    });
+    const slots = [];
+    for (let i = 0; i < 7; i++) {
+      const d = document.createElement("div");
+      if (i === 3) d.className = "divider";
+      grid.appendChild(d);
+      slots.push(d);
+    }
+    borderRows.push({ a, muscle: m.muscle, below: slots.slice(0, 3), above: slots.slice(4), tiles });
+  }
+  wrap.appendChild(grid);
+  $("#borders").appendChild(wrap);
+}
+
+// ---------------------------------------------------------------- live parts
+function renderSummary(m) {
+  const k = state.level;
+  $("#readout").textContent = `${ORD(state.p)} percentile → threshold ${fmt(R.threshold)} a.u.`;
+  $("#summary").innerHTML = `<b>${m.muscle}</b>: threshold = ${ORD(state.p)} percentile of pooled control fibers' 50% score = <b>${fmt(R.threshold, 1)} a.u.</b> `
+    + `A fiber is positive at ${k}% when at least ${PIECES[k]} of its 36 ring pieces reach it. `
+    + `Control fibers passing (pooled): <b>${LV.map(l => fmt(R.ctrlPct[l], 1)).join(" / ")}%</b> at ${LV.join(" / ")}%.`;
+}
+
+function renderTable(m) {
+  const k = state.level;
+  const head = `<tr><th>Animal</th><th>Group</th>${LV.map(l => `<th class="${l === k ? "sel" : ""}">% positive<br>at ${l}%</th>`).join("")}`
+    + `<th>Sections at ${k}%</th><th>Treated minus<br>control at ${k}%</th><th>Held-out control<br>false positives at ${k}%</th></tr>`;
+  const body = m.animals.map(a => {
+    const secs = a.sections.map(s => `sec${s.section} ${fmt(100 * countGE(s[k], R.threshold) / s.n, 1)}`).join(" · ");
+    const ex = a.group === "treated" ? `${signed(R.pct[k][a.animal] - R.ctrlPct[k])} pts` : "";
+    const h = R.held[a.animal];
+    const ho = h ? `${fmt(h.fp[k], 1)}% <span class="muted">(threshold ${fmt(h.threshold)})</span>` : "";
+    return `<tr><td><i class="sw" style="background:${COLOR(a.group)}"></i> <b>${a.animal}</b></td><td>${GROUP(a.group)}</td>`
+      + LV.map(l => `<td class="${l === k ? "sel" : ""}">${fmt(R.pct[l][a.animal], 1)}</td>`).join("")
+      + `<td class="secs">${secs}</td><td>${ex}</td><td>${ho}</td></tr>`;
+  }).join("");
+  const pooled = `<tr class="pooled"><td>Control fibers</td><td>pooled</td>`
+    + LV.map(l => `<td class="${l === k ? "sel" : ""}">${fmt(R.ctrlPct[l], 1)}</td>`).join("") + `<td></td><td></td><td></td></tr>`;
+  $("#numbers").innerHTML = `<thead>${head}</thead><tbody>${body}${pooled}</tbody>`;
+}
+
+function spread(ys, gap, maxY) {
+  // label positions at least gap apart, in order; pushed back up if the lowest would fall below maxY
+  const order = ys.map((y, i) => [y, i]).sort((a, b) => a[0] - b[0]), out = ys.slice();
+  for (let j = 1; j < order.length; j++) out[order[j][1]] = Math.max(out[order[j][1]], out[order[j - 1][1]] + gap);
+  for (let j = order.length - 1; j >= 0; j--) {
+    const lim = j === order.length - 1 ? maxY : out[order[j + 1][1]] - gap;
+    out[order[j][1]] = Math.min(out[order[j][1]], lim);
+  }
+  return out;
+}
+
+function drawCurve(m) {
+  const k = state.level, host = $("#curve");
+  $("#curveNote").textContent = `% positive at ${k}% (mean of sections) for every threshold the slider allows. The dashed line is the current setting; `
+    + `click the chart to move the threshold there. Steep stretches are where the choice of threshold matters most.`;
+  const ps = [];
+  for (let p = DATA.p_range[0]; p <= DATA.p_range[1] + 1e-9; p += 0.5) ps.push(Math.round(p * 10) / 10);
+  const series = m.animals.map(a => ({ a, y: [] }));
+  for (const p of ps) {
+    const pc = animalPct(m, pctl(m.ctrl50, p), k);
+    series.forEach(s => s.y.push(pc[s.a.animal]));
+  }
+  const W = Math.max(320, host.clientWidth || 900), H = 300, L = 46, Rm = 120, T = 22, B = 38;
+  const ymax = Math.max(1, ...series.flatMap(s => s.y)) * 1.06;
+  const X = p => L + (p - ps[0]) / (ps[ps.length - 1] - ps[0]) * (W - L - Rm);
+  const Y = v => T + (1 - v / ymax) * (H - T - B);
+  let g = "";
+  const ystep = ymax > 40 ? 10 : ymax > 20 ? 5 : ymax > 8 ? 2 : 1;
+  for (let v = 0; v <= ymax; v += ystep) g += `<line class="grid" x1="${L}" x2="${W - Rm}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
+  for (let p = Math.ceil(ps[0]); p <= ps[ps.length - 1]; p += 1) g += `<text x="${X(p)}" y="${H - B + 16}" text-anchor="middle">${p}</text>`;
+  g += `<line class="base" x1="${L}" x2="${W - Rm}" y1="${Y(0)}" y2="${Y(0)}"/>`;
+  g += `<text x="${(L + W - Rm) / 2}" y="${H - 4}" text-anchor="middle">control percentile that sets the threshold</text>`;
+  g += `<text x="${L - 6}" y="${T - 8}" text-anchor="start">% positive</text>`;
+  for (const s of series) g += `<path class="line" stroke="${COLOR(s.a.group)}" d="${s.y.map((v, i) => `${i ? "L" : "M"}${X(ps[i]).toFixed(1)},${Y(v).toFixed(1)}`).join("")}"/>`;
+  const ends = series.map(s => Y(s.y[s.y.length - 1]));
+  spread(ends, 14, H - B + 4).forEach((y, i) => {
+    const s = series[i];
+    g += `<text class="lab" x="${W - Rm + 8}" y="${y + 4}">${s.a.animal} ${GROUP(s.a.group)}</text>`;
+  });
+  const xc = X(state.p);
+  g += `<line class="vline" x1="${xc}" x2="${xc}" y1="${T - 4}" y2="${H - B}"/><text class="vlab" x="${xc + 5}" y="${T - 8}">${ORD(state.p)}</text>`;
+  g += `<line class="cross" x1="0" x2="0" y1="${T}" y2="${H - B}" visibility="hidden"/>`;
+  g += `<rect class="hit" x="${L}" y="${T}" width="${W - L - Rm}" height="${H - T - B}"/>`;
+  host.innerHTML = `<svg class="chart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="% positive per animal against the threshold percentile">${g}</svg>`;
+  const svg = host.firstChild, hit = svg.querySelector(".hit"), cross = svg.querySelector(".cross");
+  const nearest = ev => {
+    const p = ps[0] + (ev.clientX - svg.getBoundingClientRect().left - L) / (W - L - Rm) * (ps[ps.length - 1] - ps[0]);
+    return Math.max(0, Math.min(ps.length - 1, Math.round((p - ps[0]) / 0.5)));
+  };
+  hit.addEventListener("mousemove", ev => {
+    const i = nearest(ev);
+    cross.setAttribute("x1", X(ps[i])); cross.setAttribute("x2", X(ps[i])); cross.setAttribute("visibility", "visible");
+    tip.show(`<b>${ORD(ps[i])} percentile</b> <span class="muted">(threshold ${fmt(pctl(m.ctrl50, ps[i]))})</span><table>`
+      + series.map(s => `<tr><td><i class="sw" style="background:${COLOR(s.a.group)}"></i>${s.a.animal} ${GROUP(s.a.group)}</td><td>${fmt(s.y[i], 1)}%</td></tr>`).join("")
+      + `</table>`, ev);
+  });
+  hit.addEventListener("mouseleave", () => { cross.setAttribute("visibility", "hidden"); tip.hide(); });
+  hit.addEventListener("click", ev => setP(ps[nearest(ev)]));
+}
+
+function drawHist(m) {
+  const k = state.level, h = m.hist[k], threshold = R.threshold;
+  $("#histNote").textContent = `Each fiber's score at ${k}% (its ${ORD(PIECES[k])} brightest of 36 ring pieces), all sections of an animal pooled, `
+    + `% of fibers per 25 a.u. bin, same scale in every row. Darker bars are at or above the threshold; the right column gives the pooled share above it.`;
+  rowHist($("#hist"), {
+    edges: h.edges, dec: 1, vline: { x: threshold, label: `threshold ${fmt(threshold)}` }, split: threshold,
+    aria: "Histograms of fiber scores against the threshold",
+    rows: m.animals.map(a => {
+      const nTot = a.sections.reduce((t, s) => t + s.n, 0), above = a.sections.reduce((t, s) => t + countGE(s[k], threshold), 0);
+      return { name: [a.animal, GROUP(a.group)], sub: `${a.sections.length} sections`, color: COLOR(a.group), a: h.rows[a.animal],
+               stat: [`${fmt(100 * above / nTot, 1)}% above`, `${fmt(nTot)} fibers`] };
+    }),
+  });
+}
+
+function updateImages(m) {
+  const k = state.level;
+  for (const o of outlinePaths) if (o.muscle === m.muscle) o.el.setAttribute("class", outlineClass(o.c));
+  for (const r of regionSubs) if (r.muscle === m.muscle) {
+    const s = r.a.sections.find(x => x.section === r.a.section);
+    r.el.textContent = `background ${fmt(r.a.bg)} · ${fmt(100 * countGE(s[k], R.threshold) / s.n, 1)}% of this section positive at ${k}%`;
+  }
+  for (const row of borderRows) if (row.muscle === m.muscle) {
+    const ts = row.tiles.filter(t => t.c["s" + k] != null).sort((x, y) => x.c["s" + k] - y.c["s" + k]);
+    const below = ts.filter(t => t.c["s" + k] < R.threshold).slice(-3), above = ts.filter(t => t.c["s" + k] >= R.threshold).slice(0, 3);
+    const fill = (slots, tiles) => slots.forEach((slot, i) => {
+      slot.innerHTML = "";
+      const t = tiles[i];
+      if (!t) { slot.className = "empty"; slot.textContent = "none in pool"; return; }
+      slot.className = "";
+      const s = t.c["s" + k];
+      t.cap.innerHTML = `<b>${fmt(s)}</b> (${signed(s - R.threshold, 0)}) · fiber ${t.c.label}`;
+      slot.appendChild(t.fig);
+    });
+    fill(row.below, padLeft(below));   // nearest fiber next to the divider
+    fill(row.above, above);
+  }
+}
+function padLeft(arr) { const out = [null, null, null]; arr.forEach((t, i) => { out[3 - arr.length + i] = t; }); return out; }
+
+function update() {
+  const m = M();
+  R = compute(m, state.p);
+  renderSummary(m);
+  renderTable(m);
+  drawCurve(m);
+  drawHist(m);
+  updateImages(m);
+  updateOverviews(m);
+}
+
+// ---------------------------------------------------------------- controls
+const slider = $("#pSlider");
+slider.min = DATA.p_range[0]; slider.max = DATA.p_range[1]; slider.step = 0.1; slider.value = state.p;
+function syncPresets() { for (const b of $("#presetSeg").children) b.setAttribute("aria-pressed", String(Math.abs(+b.dataset.val - state.p) < 1e-9)); }
+function setP(p) { state.p = Math.round(p * 10) / 10; slider.value = state.p; syncPresets(); update(); }
+slider.addEventListener("input", () => setP(+slider.value));
+const presets = [90, 95, 98, 99];
+$("#presetSeg").innerHTML = "";
+for (const p of presets) {
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = ORD(p); b.dataset.val = p;
+  b.addEventListener("click", () => setP(p));
+  $("#presetSeg").appendChild(b);
+}
+syncPresets();
+function showMuscle() {
+  document.querySelectorAll("[data-m]").forEach(el => el.hidden = el.dataset.m !== state.muscle);
+  update();
+}
+seg($("#muscleSeg"), DATA.order.map(m => [m, m]), state, "muscle", showMuscle);
+seg($("#levelSeg"), LV.map(k => [k, `${k}% (${PIECES[k]} of 36)`]), state, "level", update);
+seg($("#rangeSeg"), [["full", "Whole range"], ["contrast", "Membrane contrast"]], state, "range", () => canvases.forEach(paint));
+// two switches (top bar and above the regions) for the one outline setting
+function onOutlines() {
+  document.body.classList.toggle("show-outlines", state.outlines === "on");
+  for (const host of [$("#outlineSeg"), $("#outlineSeg2")])
+    for (const b of host.children) b.setAttribute("aria-pressed", String(b.dataset.val === state.outlines));
+}
+seg($("#outlineSeg"), [["on", "On"], ["off", "Off"]], state, "outlines", onOutlines);
+seg($("#outlineSeg2"), [["on", "Outlines on"], ["off", "Signal only"]], state, "outlines", onOutlines);
+$("#legend").innerHTML =
+  `<span><i class="sw" style="background:var(--ctrl)"></i>control</span><span><i class="sw" style="background:var(--treated)"></i>treated</span>`
+  + [["#6da7ec", "", 2.2, "positive"], ["rgba(255,255,255,0.6)", "", 1.6, "negative"], ["#9a9890", "3 2", 1.6, "not counted"]]
+    .map(([c, dash, w, label]) => `<span><svg class="osw" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">`
+      + `<rect width="16" height="16" rx="3" fill="#000"/><rect x="3" y="3" width="10" height="10" rx="3" fill="none" stroke="${c}" `
+      + `stroke-width="${w}" stroke-dasharray="${dash}"/></svg>${label}</span>`).join("");
+
+// ---------------------------------------------------------------- static text
+$("#meta").textContent = `Move the threshold and the share of the ring required; every number, chart and outline below follows. `
+  + `The threshold is a percentile of pooled mdx control fibers' 50% score (their 18th brightest ring piece), set per muscle. `
+  + `The summary currently uses the ${ORD(DATA.default_p)} percentile. Generated ${DATA.generated}.`;
+$("#ovNote").textContent = `Each animal’s typical section, the same section as its tissue region below (white box). `
+  + `Dystrophin (GFP) minus the section’s background, averaged into ${Object.values(DATA.muscles).map(m => m.animals.map(a => a.overview.px_um)).flat().reduce((a, b) => Math.min(a, b)).toFixed(0)} to `
+  + `${Object.values(DATA.muscles).map(m => m.animals.map(a => a.overview.px_um)).flat().reduce((a, b) => Math.max(a, b)).toFixed(0)} µm pixels, `
+  + `one range per muscle: black at background, white at the 98th percentile of tissue pixels of these sections `
+  + `(${Object.values(DATA.muscles).map(m => `${m.muscle} ${fmt(m.overview_range[1])} a.u.`).join(", ")}); the Display switch applies to the regions and close-ups only. `
+  + `Blue dots mark the fibers positive at the current setting; “Signal only” hides them and the box. Click to enlarge.`;
+$("#regionNote").textContent = `One ${DATA.muscles[DATA.order[0]].region_um} µm region per animal from its typical section (the middle of its sections by median membrane dystrophin). `
+  + `The region is the densely packed, in-focus window whose share of positive fibers at the summary's threshold (${ORD(DATA.default_p)} percentile, 50%) is closest to the section's. `
+  + `Outlines show the call at the current setting. Click to enlarge; hover a fiber for its scores and calls.`;
+$("#borderNote").textContent = `From each animal's typical section, the three fibers whose score at the chosen ring share sits just below the threshold (left) `
+  + `and just above it (right). Caption: score, distance to the threshold, fiber label. They come from a pool of mid-sized fibers (500 to 4,000 µm²) `
+  + `spread over the slider's whole range, so a gap of more than about 40 a.u. to the threshold means no closer fiber was pooled. `
+  + `${DATA.muscles[DATA.order[0]].closeup_um} µm close-ups, 20 µm scale bar.`;
+const mrng = Object.values(DATA.muscles).map(m => `${m.muscle} ${fmt(m.ranges.full[0])} to ${fmt(m.ranges.full[1])} (contrast ${fmt(m.ranges.contrast[0])} to ${fmt(m.ranges.contrast[1])})`).join("; ");
+$("#methods").innerHTML = [
+  `Calls use each fiber's saved scores at 50 / 60 / 70% (tables/calls.csv.gz). The threshold is computed in this page with numpy's linear percentile, so at the summary's setting the numbers match sections.csv and animals.csv.`,
+  `Treated minus control: an animal's % positive (mean of sections) minus the pooled control fibers' %. Held-out: the threshold from the other control animals at the same percentile, applied to the held-out animal's pooled fibers.`,
+  `Images: GFP minus each section's off-tissue background, one linear range per muscle (background-subtracted a.u.): ${mrng}.`,
+].map(t => `<li>${t}</li>`).join("");
+
+showMuscle();
+let rt;
+addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { drawCurve(M()); drawHist(M()); updateOverviews(M()); }, 120); });
+</script>
+</body>
+</html>
