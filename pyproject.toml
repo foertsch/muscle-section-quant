@@ -1,6 +1,6 @@
 [project]
 name = "muscle-section-quant"
-version = "0.1.0"
+version = "0.2.0"
 description = "Whole-section quantification of mouse muscle histology in Nikon ND2 scans, starting with dystrophin per fiber"
 readme = "README.md"
 license = "MIT"
@@ -27,6 +27,7 @@ dependencies = [
 [project.scripts]
 msq-dystrophin = "msq.dystrophin.run_pipeline:main"
 msq-dystrophin-app = "msq.dystrophin.app:main"
+msq-psr = "msq.psr.run_pipeline:main"
 
 [dependency-groups]
 dev = ["pytest==9.1.1"]

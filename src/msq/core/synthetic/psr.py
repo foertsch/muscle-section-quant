@@ -20,7 +20,7 @@ WB Blue: 3.16
 """
 
 IMAGING = {"exposure_ms": 11.0, "gain": 1.0, "wb_red": 2.43, "wb_blue": 3.16, "light": 63.0, "sharpness": "Medium",
-           "acquired": "2026-03-30 14:49"}
+           "acquired": "2026-01-01 12:00"}
 
 HEADER = {"sizes": {"Y": 100, "X": 120, "S": 3}, "channels": ["Brightfield"], "px_um": 0.2167, "bits": 8,
           "imaging": IMAGING}

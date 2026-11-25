@@ -1,0 +1,64 @@
+# Cohorts for the PSR pipeline: how a dataset names its groups on disk and in figures, which group is the control and
+# how its animals are numbered. Copy this file to cohorts.local.toml (untracked, never exported) and write the lab's
+# own cohorts there; load_cohort("<name>") reads cohorts.local.toml and falls back to this file, so tests, the demo
+# and a first run work with the generic groups below. Where the file is looked for: msq.core.config (MSQ_CONFIG_DIR,
+# else the repository root, else the working directory).
+#
+# One table per cohort. A cohort says, for its groups:
+#   folders      top folder below the scan folder (any case, without its leading number) -> group
+#   order        plotting and table order, control first
+#   control      the control group
+#   labels       group -> display name in figures and tables
+#   colours      group -> colour
+#   animal       regular expression; its groups, joined by "-", are the animal id
+#   file_groups  group -> pattern of a whole word in a file name that names the group (optional; a scan whose file
+#                name names another group than its folder is reported and the file name wins)
+
+# Scans in numbered group folders ("<number> <group>"), animals numbered "<cohort number>-<animal number>".
+# Example: <scan folder>/1001 group a/1001-101-quad/2-1001-101-20x-full.nd2 is section 2 of animal 1001-101.
+[example]
+order = ["control", "group_a", "group_b"]
+control = "control"
+animal = '(?<!\d)(\d{4})[- ](\d{3})(?!\d)'
+
+[example.folders]
+control = "control"
+"group a" = "group_a"
+"group b" = "group_b"
+
+[example.labels]
+control = "Control"
+group_a = "Group A"
+group_b = "Group B"
+
+[example.colours]
+control = "#4D4D4D"
+group_a = "#1B9E77"
+group_b = "#D95F02"
+
+# Scans in one folder per group, animals numbered alone, the group also named in the file name.
+# Example: <scan folder>/Control/901 ctl QUAD/2-901-ctl-quad-20full.nd2 is section 2 of animal 901.
+[example_named]
+order = ["control", "group_a", "group_b"]
+control = "control"
+animal = '(?<![\d.])(\d{3})(?![\d.])'
+
+[example_named.folders]
+control = "control"
+group_a = "group_a"
+group_b = "group_b"
+
+[example_named.labels]
+control = "Control"
+group_a = "Group A"
+group_b = "Group B"
+
+[example_named.colours]
+control = "#4D4D4D"
+group_a = "#1B9E77"
+group_b = "#D95F02"
+
+[example_named.file_groups]
+control = 'ctl\d*'
+group_a = 'gra'
+group_b = 'grb'

@@ -1,0 +1,5 @@
+sample,group,muscle,animal,section,path
+QUAD_sec1_A01_control,control,QUAD,A01,1,synthetic:QUAD_sec1_A01_control
+QUAD_sec1_A02_control,control,QUAD,A02,1,synthetic:QUAD_sec1_A02_control
+QUAD_sec1_B01_group_a,group_a,QUAD,B01,1,synthetic:QUAD_sec1_B01_group_a
+QUAD_sec1_B02_group_a,group_a,QUAD,B02,1,synthetic:QUAD_sec1_B02_group_a

@@ -1,0 +1,59 @@
+{
+ "sample": "QUAD_sec1_A02_control",
+ "source": "synthetic:QUAD_sec1_A02_control",
+ "variant": "base",
+ "params": {
+  "downsample": 6,
+  "seg_input": "fiber",
+  "white_t": 0.8,
+  "white_max_um2": 150.0,
+  "cp_flow_threshold": 0.4,
+  "cp_cellprob_threshold": 0.0,
+  "cp_batch_size": 16,
+  "edge_um": 1.5,
+  "bg_margin_um": 200.0,
+  "sat_background": 40,
+  "hue_red_below": 23,
+  "hue_red_from": 234,
+  "hue_yellow_to": 50,
+  "section_close_um": 50.0
+ },
+ "pixel_size_um": 0.2167,
+ "grid_um": 1.3002,
+ "edge_px": 1,
+ "image_px": [
+  3600,
+  3600
+ ],
+ "background_rgb": [
+  200.0,
+  190.0,
+  210.0
+ ],
+ "section_area_mm2": 0.07243371215388,
+ "n_objects": 58,
+ "n_objects_in_section": 56,
+ "section_class_px": {
+  "bg": 33108,
+  "red": 931948,
+  "yellow": 553400,
+  "other": 24036
+ },
+ "red_fraction": 0.627427377288016,
+ "collagen_outside_fraction": 0.6191316782329798,
+ "coverage_yellow": 0.9720780628839899,
+ "red_in_masks": 0.01322176773811412,
+ "unsegmented_class_px": {
+  "bg": 16094,
+  "red": 919626,
+  "yellow": 15452,
+  "other": 13880
+ },
+ "seconds": {
+  "read": 0.2,
+  "segment": 0.0,
+  "classify_count": 0.9,
+  "total": 1.1
+ },
+ "peak_memory_gb": 2.44
+}

@@ -28,5 +28,5 @@ def test_exposure_units_and_acquisition_time():
     with pytest.raises(ValueError):
         to_ms("fast")
     assert acquired("23.07.2026  13:46:15") == "2026-07-23 13:46:15"
-    assert acquired("30.03.2026  14:49:13", "%Y-%m-%d %H:%M") == "2026-03-30 14:49"
+    assert acquired("01.01.2026  12:00:00", "%Y-%m-%d %H:%M") == "2026-01-01 12:00"
     assert acquired("  ") is None

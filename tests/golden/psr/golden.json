@@ -1,0 +1,122 @@
+{
+ "pipeline": "psr",
+ "produced": {
+  "date": "2026-10-27",
+  "code_version": "v1.0.0",
+  "repo": "psr-quant",
+  "platform": "darwin-arm64",
+  "python": "3.13.12",
+  "packages": {
+   "python": "3.13.12",
+   "cellpose": "4.2.1.1",
+   "torch": "2.14.1",
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "scikit-image": "0.26.0",
+   "pandas": "3.0.6",
+   "nd2": "0.12.0",
+   "tifffile": "2026.10.15"
+  }
+ },
+ "design": [
+  {
+   "sample": "QUAD_sec1_A01_control",
+   "muscle": "QUAD",
+   "group": "control",
+   "animal": "A01",
+   "section": 1,
+   "fibrosis": "low"
+  },
+  {
+   "sample": "QUAD_sec1_A02_control",
+   "muscle": "QUAD",
+   "group": "control",
+   "animal": "A02",
+   "section": 1,
+   "fibrosis": "low"
+  },
+  {
+   "sample": "QUAD_sec1_B01_group_a",
+   "muscle": "QUAD",
+   "group": "group_a",
+   "animal": "B01",
+   "section": 1,
+   "fibrosis": "high"
+  },
+  {
+   "sample": "QUAD_sec1_B02_group_a",
+   "muscle": "QUAD",
+   "group": "group_a",
+   "animal": "B02",
+   "section": 1,
+   "fibrosis": "high"
+  }
+ ],
+ "groups": {
+  "order": [
+   "control",
+   "group_a"
+  ],
+  "control": "control",
+  "labels": {
+   "control": "control",
+   "group_a": "group A"
+  },
+  "colours": {
+   "control": "#898781",
+   "group_a": "#2a78d6"
+  }
+ },
+ "inputs": "inputs.npz: per sample <sample>/frame_bgr (uint8, Y x X x 3 in the file's BGR order, as the reader returns it) and <sample>/labels_ds6 (uint32, the segmentation at downsample 6); px_um",
+ "how": "section.run_frame(frame, px_um, out, params_for('base'), sample, segment=<the stored labels>) per sample into run/sections/base/<sample>/; samples.csv written by hand with the generic groups; summary.main(run, --out run/tables) with settings.GROUP_ORDER, CONTROL_GROUP, GROUP_LABELS and GROUP_COLOURS set to 'groups'",
+ "compare": [
+  "samples.csv",
+  "sections/base/QUAD_sec1_A01_control/objects.csv",
+  "sections/base/QUAD_sec1_A01_control/section.json",
+  "sections/base/QUAD_sec1_A01_control/hue_sat_hist.npz",
+  "sections/base/QUAD_sec1_A02_control/objects.csv",
+  "sections/base/QUAD_sec1_A02_control/section.json",
+  "sections/base/QUAD_sec1_A02_control/hue_sat_hist.npz",
+  "sections/base/QUAD_sec1_B01_group_a/objects.csv",
+  "sections/base/QUAD_sec1_B01_group_a/section.json",
+  "sections/base/QUAD_sec1_B01_group_a/hue_sat_hist.npz",
+  "sections/base/QUAD_sec1_B02_group_a/objects.csv",
+  "sections/base/QUAD_sec1_B02_group_a/section.json",
+  "sections/base/QUAD_sec1_B02_group_a/hue_sat_hist.npz",
+  "tables/sections.csv",
+  "tables/animals.csv",
+  "tables/genotypes.csv",
+  "tables/fibers.csv.gz",
+  "tables/palette.csv"
+ ],
+ "not_compared": [
+  "sections/base/QUAD_sec1_A01_control/classes_ds6.tif",
+  "sections/base/QUAD_sec1_A01_control/labels_ds6.tif",
+  "sections/base/QUAD_sec1_A01_control/rgb_ds6.tif",
+  "sections/base/QUAD_sec1_A01_control/section_ds6.tif",
+  "sections/base/QUAD_sec1_A02_control/classes_ds6.tif",
+  "sections/base/QUAD_sec1_A02_control/labels_ds6.tif",
+  "sections/base/QUAD_sec1_A02_control/rgb_ds6.tif",
+  "sections/base/QUAD_sec1_A02_control/section_ds6.tif",
+  "sections/base/QUAD_sec1_B01_group_a/classes_ds6.tif",
+  "sections/base/QUAD_sec1_B01_group_a/labels_ds6.tif",
+  "sections/base/QUAD_sec1_B01_group_a/rgb_ds6.tif",
+  "sections/base/QUAD_sec1_B01_group_a/section_ds6.tif",
+  "sections/base/QUAD_sec1_B02_group_a/classes_ds6.tif",
+  "sections/base/QUAD_sec1_B02_group_a/labels_ds6.tif",
+  "sections/base/QUAD_sec1_B02_group_a/rgb_ds6.tif",
+  "sections/base/QUAD_sec1_B02_group_a/section_ds6.tif",
+  "tables/collagen_outside_by_genotype.png",
+  "tables/collagen_vs_fiber_size.png"
+ ],
+ "volatile_keys": [
+  "source",
+  "seconds",
+  "peak_memory_gb",
+  "versions",
+  "host"
+ ],
+ "volatile_columns": [
+  "path"
+ ]
+}

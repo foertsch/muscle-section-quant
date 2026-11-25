@@ -11,3 +11,15 @@ sample = "TA_sec1_1101_20x_treated"  # a section of that run (its samples.csv)
 # fiber = 0                       # label of the fiber for ring_sectors.png (default: a round fiber with an even ring)
 # calls = false                   # true: also write calls.png, outlines coloured by the 50% call
 # out = "demo/crops"              # where the PNGs go (git ignores it)
+# assay = "dystrophin"            # "dystrophin" (default) or "psr", see the PSR block below
+# variant = "base"                # PSR only: the variant folder below run/sections/
+
+# PSR mode: a finished PSR run (msq-psr, or demo/run_psr_demo.py). Replace the block above with this one, with the
+# demo's own sample names: four crops of one window (colour, pixel classes, fiber outlines, collagen outside the
+# outlines), drawn from the run's downsampled outputs. scan is not used; pick, at and window_um work as above.
+#
+# assay = "psr"
+# run = "demo/output/psr/run"
+# sample = "QUAD_sec1_B01_group_a"
+# pick = "typical"                # lower, typical, higher: by the share of collagen outside the outlines
+# window_um = 300                 # 300 to 600 um

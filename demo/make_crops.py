@@ -1,5 +1,6 @@
 """README crops from one section of a finished run: the segmentation outlines, one fiber's ring sectors and, if asked,
 the calls. Images only (no text, no numbers), written straight from arrays as PNG files without metadata.
+With assay = "psr" in the config the crops come from a finished PSR run instead (see "PSR mode" below).
 
     uv run python demo/make_crops.py demo/crops.local.toml
 
@@ -15,6 +16,18 @@ Writes to the out folder:
                        (darker = dimmer, scaled within this fiber); scale bar 10 um
     calls.png          with calls = true: the window's dystrophin, outlines coloured by the 50% call: blue positive,
                        light grey negative, dark grey not called or excluded
+
+PSR mode (assay = "psr"): the same window of one section four ways, from the per-section outputs of msq.psr.section
+(rgb_ds<f>.tif, classes_ds<f>.tif, labels_ds<f>.tif, section_ds<f>.tif in run/sections/<variant>/<sample>/), each
+section grid pixel drawn 3 x 3. The scan is not read. Writes:
+    psr_colour.png            the colour image divided by the glass colour; scale bar 50 um
+    psr_classes.png           the same window with the pixel classes: red (collagen) and yellow (fiber) shown, the
+                              others dimmed
+    psr_outlines.png          the Cellpose-SAM outlines (white) on the colour image
+    psr_collagen_outside.png  red-class pixels in the main section outside every outline, highlighted (magenta);
+                              red inside an outline (dark red) does not count towards the readout
+The window is the pick (lower, typical, higher) among windows mostly inside the main section, by the share of collagen
+outside the outlines, or the one given by at.
 
 The window is one the reports would pick (densely covered by in-focus included fibers, no excluded objects), at the
 10th, 50th or 90th percentile of local dystrophin (pick = lower, typical, higher), or the one given by at. The file
@@ -43,10 +56,15 @@ from msq.dystrophin.scans import ND2Scans, NpzScans
 
 HERE = Path(__file__).resolve().parent
 DEFAULTS = {"run": None, "sample": None, "scan": None, "pick": "typical", "at": None, "window_um": 360,
-            "fiber": None, "calls": False, "out": HERE / "crops"}
+            "fiber": None, "calls": False, "out": HERE / "crops", "assay": "dystrophin", "variant": "base"}
+ASSAYS = ("dystrophin", "psr")
 PICKS = {"lower": 0.10, "typical": 0.50, "higher": 0.90}  # quantile of the candidate windows' local medians
 WINDOW_UM = (300, 600)  # the README image rules
 NAMES = ("segmentation.png", "ring_sectors.png", "calls.png")
+PSR_NAMES = ("psr_colour.png", "psr_classes.png", "psr_outlines.png", "psr_collagen_outside.png")
+PSR_ZOOM = 3  # PSR crops: each section grid pixel drawn as 3 x 3
+PSR_MIN_SECTION = 0.7  # a PSR window must lie at least this much inside the main section
+PSR_COLOURS = {"red": "#d6333a", "yellow": "#f5d142", "outside": "#ff2bd6", "inside": "#5a1418", "outline": "#ffffff"}
 
 STATUS = {"included": "#ffffff", "flagged": qc.FLAGGED, "excluded": qc.MUTED}
 CALL = {"positive": "#6da7ec", "negative": "#d9d8d2", "other": "#6b6a65"}  # as the reports draw them
@@ -65,6 +83,8 @@ def read_config(path: Path) -> dict:
     unknown = set(cfg) - set(DEFAULTS)
     if unknown:
         raise ValueError(f"unknown keys in {path.name}: {', '.join(sorted(unknown))}")
+    if cfg["assay"] not in ASSAYS:
+        raise ValueError(f"assay must be one of {', '.join(ASSAYS)}, not {cfg['assay']!r}")
     for key in ("run", "sample"):
         if cfg[key] is None:
             raise ValueError(f"{path.name} needs {key} = ...")
@@ -246,12 +266,113 @@ def ring_image(sec: dict, label: int) -> np.ndarray:
     return np.hstack([rgba[0], gap, rgba[1]])
 
 
+# ---------------------------------------------------------------- PSR mode
+
+
+def load_psr_section(run: Path, sample: str, variant: str = "base") -> dict:
+    """The per-section outputs of msq.psr.section for one sample, all on the segmentation grid."""
+    d = run / "sections" / variant / sample
+    if not (d / "section.json").is_file():
+        raise ValueError(f"no PSR section {sample!r} in {run / 'sections' / variant}")
+    info = json.loads((d / "section.json").read_text(encoding="utf-8"))
+    f = int(info["params"]["downsample"])
+    rgb_ = tifffile.imread(d / f"rgb_ds{f}.tif")
+    return {"f": f, "grid_um": float(info["grid_um"]), "rgb": rgb_, "labels": tifffile.imread(d / f"labels_ds{f}.tif"),
+            "classes": tifffile.imread(d / f"classes_ds{f}.tif"), "section": tifffile.imread(d / f"section_ds{f}.tif") > 0}
+
+
+def psr_red_outside(sec: dict) -> np.ndarray:
+    """Section grid pixels whose main class is red, in the main section, inside no outline."""
+    return (sec["classes"].argmax(-1) == 1) & sec["section"] & (sec["labels"] == 0)
+
+
+def psr_window_share(sec: dict, sl: tuple) -> float:
+    """Collagen outside the outlines in the window, as section.py defines it: red outside / (red + yellow), over the
+    window's main-section pixels, on the section grid."""
+    main = sec["classes"][sl].argmax(-1)[sec["section"][sl]]
+    return float(psr_red_outside(sec)[sl].sum() / max(1, ((main == 1) | (main == 2)).sum()))
+
+
+def psr_pick_window(sec: dict, size: int, pick: str) -> tuple[int, int]:
+    """Top-left (section grid pixels) of the window at the pick's quantile of collagen outside the outlines among the
+    windows that are mostly main section and hold outlines."""
+    H, W = sec["labels"].shape
+    stride = max(size // 5, 1)
+    cands = []
+    for y0 in range(0, H - size + 1, stride):
+        for x0 in range(0, W - size + 1, stride):
+            sl = np.s_[y0:y0 + size, x0:x0 + size]
+            if sec["section"][sl].mean() >= PSR_MIN_SECTION and (sec["labels"][sl] > 0).mean() >= 0.05:
+                cands.append((psr_window_share(sec, sl), y0, x0))
+    if not cands:
+        raise ValueError(f"no window of {size} grid pixels lies in the main section and holds outlines; "
+                         "give one with at = [y, x]")
+    cands.sort()
+    _, y0, x0 = cands[min(int(PICKS[pick] * len(cands)), len(cands) - 1)]
+    return y0, x0
+
+
+def psr_images(sec: dict, y0: int, x0: int, size: int) -> dict[str, np.ndarray]:
+    """The four PSR crops of one window (section grid y0, x0, size), drawn PSR_ZOOM times larger."""
+    z = PSR_ZOOM
+    sl = np.s_[y0:y0 + size, x0:x0 + size]
+
+    def up(a: np.ndarray) -> np.ndarray:
+        return np.kron(a, np.ones((z, z) + (1,) * (a.ndim - 2), a.dtype))
+
+    colour = up(sec["rgb"][sl])
+    dim = (colour * 0.35).astype(np.uint8)
+    main = up(sec["classes"][sl].argmax(-1))
+    classes = dim.copy()
+    classes[main == 1], classes[main == 2] = rgb(PSR_COLOURS["red"]), rgb(PSR_COLOURS["yellow"])
+    edges = outlines(sec["labels"][sl], z)
+    outl = colour.copy()
+    paint(outl, edges, {}, PSR_COLOURS["outline"])
+    outside = dim.copy()
+    red_in = (main == 1) & ~up(psr_red_outside(sec)[sl])
+    outside[red_in] = rgb(PSR_COLOURS["inside"])
+    outside[up(psr_red_outside(sec)[sl])] = rgb(PSR_COLOURS["outside"])
+    paint(outside, edges, {}, PSR_COLOURS["outline"])
+    out = dict(zip(PSR_NAMES, (colour, classes, outl, outside)))
+    for img in out.values():
+        scale_bar(img, 50 / sec["grid_um"] * z)
+    return out
+
+
+def make_psr_crops(cfg: dict) -> dict:
+    if cfg["scan"] is not None:
+        raise ValueError("scan is not used in PSR mode (the crops come from the run's downsampled outputs)")
+    lo, hi = WINDOW_UM
+    if not lo <= cfg["window_um"] <= hi:
+        raise ValueError(f"window_um must be {lo} to {hi} (the README image rules), not {cfg['window_um']}")
+    sec = load_psr_section(Path(cfg["run"]).expanduser(), cfg["sample"], cfg["variant"])
+    f, H, W = sec["f"], *sec["labels"].shape
+    size = int(round(cfg["window_um"] / sec["grid_um"]))
+    if size > min(H, W):
+        raise ValueError(f"the section image is smaller than a {cfg['window_um']} um window")
+    if cfg["at"] is not None:
+        y0, x0 = (min(max(int(v) // f, 0), lim - size) for v, lim in zip(cfg["at"], (H, W)))
+    else:
+        y0, x0 = psr_pick_window(sec, size, cfg["pick"])
+    out = Path(cfg["out"]).expanduser()
+    out.mkdir(parents=True, exist_ok=True)
+    for name in NAMES + PSR_NAMES:
+        (out / name).unlink(missing_ok=True)
+    images = psr_images(sec, y0, x0, size)
+    for name, img in images.items():
+        save_png(img, out / name)
+    return {"y0": y0 * f, "x0": x0 * f, "size": size * f, "um": size * sec["grid_um"], "written": sorted(images),
+            "collagen_outside": psr_window_share(sec, np.s_[y0:y0 + size, x0:x0 + size])}
+
+
 # ---------------------------------------------------------------- main
 
 
 def make_crops(cfg: dict) -> dict:
     """Write the crops for one section; returns the choices made (window, size, fiber, local median)."""
     cfg = {**DEFAULTS, **cfg}
+    if cfg["assay"] == "psr":
+        return make_psr_crops(cfg)
     lo, hi = WINDOW_UM
     if not lo <= cfg["window_um"] <= hi:
         raise ValueError(f"window_um must be {lo} to {hi} (the README image rules), not {cfg['window_um']}")
@@ -296,8 +417,9 @@ def main() -> None:
         got = make_crops(cfg)
     except ValueError as e:
         raise SystemExit(str(e)) from None
-    print(f"{cfg['sample']}: window at (y={got['y0']}, x={got['x0']}) px, {got['um']:.0f} um wide; ring fiber "
-          f"{got['fiber']}; local median {got['local_median']:.0f}")
+    where = f"{cfg['sample']}: window at (y={got['y0']}, x={got['x0']}) px, {got['um']:.0f} um wide; "
+    print(where + (f"collagen outside the outlines {100 * got['collagen_outside']:.1f}% of red plus yellow"
+                   if cfg["assay"] == "psr" else f"ring fiber {got['fiber']}; local median {got['local_median']:.0f}"))
     print(f"wrote {', '.join(got['written'])} to {Path(cfg['out']).expanduser()}")
     print(f'caption: "crop from one of the lab\'s mouse muscle sections; {got["um"]:.0f} µm wide, scale bar 50 µm"')
 

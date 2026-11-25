@@ -1,0 +1,5 @@
+group,animal,n_sections,collagen_outside_fraction,red_fraction,n_fibers,min_feret_median_um,max_feret_median_um
+control,A01,1,0.6378,0.6455,55,23.4036,27.0554
+control,A02,1,0.6191,0.6274,56,23.4036,27.1022
+group_a,B01,1,0.7841,0.79,46,19.503,23.2213
+group_a,B02,1,0.792,0.7976,47,18.2028,22.3695

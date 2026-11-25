@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fiber Outline Check</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<!--ASSET base.css-->
+<style>
+/* Layout: a dark lightbox stage for the histology window, a narrow tool rail beside it (stacks under it on phones). */
+:root {
+  color-scheme: dark;
+  --page: #17181b; --surface: #202226; --border: #34373d; --ink: #e9e7e2; --muted: #a3a29c; --accent: #00e5ff;
+  --k1: #2f6bff;          /* missed fiber */
+  --k2: #b100e8;          /* merged */
+  --k3: #111111;          /* split */
+  --k4: #ffffff;          /* not a fiber */
+  --ok: #7ed39b;
+  --warn: #f0b35a;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+html, body { height: 100%; }
+body { font: 15px/1.45 var(--font-body); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 28px; max-width: 1360px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+h1 { font-size: 1.35rem; margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 0.9rem; }
+.chip { font-family: var(--font-mono); font-size: 0.78rem; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+.chip.shared { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); }
+.chip.local { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+.stage { position: relative; background: #000; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; cursor: crosshair; user-select: none; -webkit-user-select: none; touch-action: manipulation; max-width: 100%; aspect-ratio: 1 / 1; }
+.stage img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.stage .overlay[hidden] { display: none !important; }
+.marker { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; display: grid; place-items: center; font: 600 12px/1 var(--font-mono); color: #fff; box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0,0,0,.6); pointer-events: none; }
+.marker.k1 { background: var(--k1); }
+.marker.k2 { background: var(--k2); }
+.marker.k3 { background: var(--k3); }
+.marker.k4 { background: var(--k4); color: #111; box-shadow: 0 0 0 2px #111, 0 1px 3px rgba(0,0,0,.6); }
+.scale { position: absolute; left: 12px; bottom: 12px; display: grid; gap: 3px; font: 600 11px/1 var(--font-mono); color: #111; pointer-events: none; }
+.scale i { display: block; height: 5px; background: #111; box-shadow: 0 0 0 1px rgba(255,255,255,.7); }
+.stage .loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 0.9rem; }
+aside { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px; display: grid; gap: 16px; position: sticky; top: env(safe-area-inset-top, 0px); }
+@media (max-width: 900px) { aside { position: static; } }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+.nav { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+.nav .now { text-align: center; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.dots { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.dots button { width: 30px; height: 26px; padding: 0; font: 600 11px/1 var(--font-mono); }
+.dots button.done { background: color-mix(in srgb, var(--ok) 30%, var(--surface)); border-color: var(--ok); color: var(--ink); }
+.dots button.current { outline: 2px solid var(--accent); outline-offset: 1px; }
+button { font: inherit; color: var(--ink); background: #2a2d32; border: 1px solid var(--border); border-radius: 5px; padding: 7px 10px; cursor: pointer; }
+button:hover { background: #33373d; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: default; }
+.kinds { display: grid; gap: 6px; }
+.kind { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; text-align: left; padding: 8px 10px; }
+.kind .sw { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 600 11px/1 var(--font-mono); color: #fff; box-shadow: 0 0 0 2px #fff; }
+.kind .sw.k4 { color: #111; box-shadow: 0 0 0 2px #111; background: var(--k4); }
+.kind .n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+.kind[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, #2a2d32); }
+.kind small { display: block; color: var(--muted); font-size: 0.78rem; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+.row button { flex: 1 1 auto; }
+.primary { background: color-mix(in srgb, var(--ok) 22%, #2a2d32); border-color: color-mix(in srgb, var(--ok) 55%, var(--border)); }
+.primary.is-done { background: #2a2d32; border-color: var(--border); }
+details { border-top: 1px solid var(--border); padding-top: 12px; }
+summary { cursor: pointer; color: var(--muted); }
+details ol { padding-left: 18px; margin: 8px 0 0; display: grid; gap: 6px; font-size: 0.88rem; }
+kbd { font: 600 0.75rem/1 var(--font-mono); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 2px 5px; color: var(--ink); }
+.keys { font-size: 0.8rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.note { font-size: 0.82rem; color: var(--muted); margin: 1em 0; max-width: none; }
+textarea { width: 100%; min-height: 90px; font: 0.75rem/1.3 var(--font-mono); background: #111; color: var(--ink); border: 1px solid var(--border); border-radius: 5px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.who { display: grid; gap: 6px; }
+input[type=text] { font: inherit; color: var(--ink); background: #111; border: 1px solid var(--border); border-radius: 5px; padding: 7px 9px; width: 100%; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Fiber Outline Check</h1>
+      <div class="sub">PSR whole sections, Cellpose-SAM outlines in cyan. One 250 µm window per section, genotype hidden. Run: <!--RUN--></div>
+    </div>
+    <span id="status" class="chip local">Marks stay in this browser until you download them</span>
+  </header>
+
+  <main>
+    <div>
+      <div id="stage" class="stage" role="img" aria-label="Histology window with fiber outlines; click to mark problems">
+        <div class="loading" id="loading">Loading window…</div>
+        <img id="base" alt="">
+        <img id="overlay" class="overlay" alt="">
+        <div id="markers"></div>
+        <div class="scale" id="scale"><i id="scalebar"></i><span>50 µm</span></div>
+      </div>
+    </div>
+
+    <aside>
+      <section class="who">
+        <label class="label" for="reviewer">Your initials</label>
+        <input type="text" id="reviewer" maxlength="12" autocomplete="off" placeholder="e.g. AF">
+      </section>
+
+      <section>
+        <div class="label">Window</div>
+        <div class="nav">
+          <button id="prev" aria-label="Previous window">←</button>
+          <div class="now" id="now">–</div>
+          <button id="next" aria-label="Next window">→</button>
+        </div>
+        <div class="dots" id="dots"></div>
+      </section>
+
+      <section>
+        <div class="label">Click marks</div>
+        <div class="kinds" id="kinds"></div>
+      </section>
+
+      <section class="row">
+        <button id="toggle" aria-pressed="true">Outlines on</button>
+        <button id="undo">Undo</button>
+      </section>
+
+      <section class="row">
+        <button id="done" class="primary">Window done, next</button>
+      </section>
+
+      <div class="keys"><span><kbd>1</kbd>–<kbd>4</kbd> mark</span><span><kbd>O</kbd> outlines</span><span>hold <kbd>Space</kbd> to peek</span><span><kbd>Z</kbd> undo</span><span><kbd>←</kbd><kbd>→</kbd> window</span><span><kbd>D</kbd> done</span></div>
+
+      <details open>
+        <summary>How to score a window</summary>
+        <ol>
+          <li>Judge only fibers whose middle lies inside the window.</li>
+          <li><b>Missed fiber</b>: a fiber with no outline. Click inside it.</li>
+          <li><b>Merged</b>: one outline around two or more fibers. Click inside that outline, once.</li>
+          <li><b>Split</b>: one fiber cut into two or more outlines. Click on the fiber, once.</li>
+          <li><b>Not a fiber</b>: an outline around collagen, a vessel, a hole or a fold. Click inside it.</li>
+          <li>Leave correct outlines alone. Turn outlines off (<kbd>O</kbd>) to check a fiber's edge.</li>
+          <li>Click <b>Window done</b> when a window is finished, even with no marks.</li>
+        </ol>
+      </details>
+
+      <section>
+        <div class="label">Results</div>
+        <div class="row"><button id="download" class="primary">Download results</button><button id="copy">Copy</button></div>
+        <p class="note" id="exportNote">Saves a small .json file with your marks. Put it in the project folder.</p>
+        <textarea id="exportText" readonly aria-label="Results as text" hidden></textarea>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<!--ASSET base.js-->
+<script>
+const DATA = /*DATA*/null;
+const { run: RUN, windows: WINDOWS, images: IMAGES } = DATA;
+const KINDS = [
+  { k: 1, label: "Missed fiber", hint: "no outline" },
+  { k: 2, label: "Merged", hint: "one outline, 2+ fibers" },
+  { k: 3, label: "Split", hint: "one fiber, 2+ outlines" },
+  { k: 4, label: "Not a fiber", hint: "collagen, vessel, hole, fold" },
+];
+const LOCAL_KEY = "fiber-outline-check:" + RUN;
+
+const state = { i: 0, kind: 1, outlines: true, peek: false, reviewer: "", clicks: [], done: new Set() };
+const stage = $("#stage"), base = $("#base"), overlay = $("#overlay"), markers = $("#markers");
+const current = () => WINDOWS[state.i];
+const clicksIn = (w) => state.clicks.filter((c) => c.w === w);
+
+const store = persist(LOCAL_KEY);   // blocked storage: the marks stay in memory only
+function load() {
+  const saved = store.get();
+  state.clicks = saved.clicks || [];
+  state.done = new Set(saved.done || []);
+  state.reviewer = saved.reviewer || "";
+}
+function save() { store.set({ reviewer: state.reviewer, clicks: state.clicks, done: [...state.done] }); }
+
+function results() {
+  return { run: RUN, reviewer: state.reviewer, saved: new Date().toISOString(), done: [...state.done],
+           windows: WINDOWS.map(({ id, size_px, size_um, n_outlines }) => ({ id, size_px, size_um, n_outlines })),
+           clicks: state.clicks.map(({ w, kind, x, y, at }) => ({ w, kind, x, y, at })) };
+}
+
+function addClick(x, y) {
+  state.clicks.push({ w: current().id, kind: state.kind, x: +x.toFixed(4), y: +y.toFixed(4), at: new Date().toISOString() });
+  save();
+  render();
+}
+function undo() {
+  const w = current().id;
+  for (let j = state.clicks.length - 1; j >= 0; j--) {
+    if (state.clicks[j].w === w) { state.clicks.splice(j, 1); break; }
+  }
+  save();
+  render();
+}
+function toggleDone() {
+  const w = current().id;
+  const nowDone = !state.done.has(w);
+  nowDone ? state.done.add(w) : state.done.delete(w);
+  save();
+  render();
+  if (nowDone) goToNextOpen();
+}
+function goToNextOpen() {
+  for (let s = 1; s <= WINDOWS.length; s++) {
+    const j = (state.i + s) % WINDOWS.length;
+    if (!state.done.has(WINDOWS[j].id)) { show(j); return; }
+  }
+  $("#exportNote").textContent = "All windows done. Download your results.";
+}
+
+function show(i) {
+  state.i = (i + WINDOWS.length) % WINDOWS.length;
+  const w = current();
+  $("#loading").hidden = false;
+  base.onload = () => { $("#loading").hidden = true; };
+  base.src = IMAGES[w.id].base;
+  overlay.src = IMAGES[w.id].outlines;
+  render();
+}
+
+function render() {
+  const w = current();
+  if (!w) return;
+  $("#now").textContent = `${state.i + 1} of ${WINDOWS.length}`;
+  overlay.hidden = !(state.outlines && !state.peek);
+  $("#toggle").textContent = state.outlines ? "Outlines on" : "Outlines off";
+  $("#toggle").setAttribute("aria-pressed", String(state.outlines));
+  $("#scalebar").style.width = (50 / w.size_um * stage.clientWidth) + "px";
+
+  const here = clicksIn(w.id);
+  markers.replaceChildren(...here.map((c) => {
+    const m = document.createElement("div");
+    m.className = "marker k" + c.kind;
+    m.style.left = (c.x * 100) + "%";
+    m.style.top = (c.y * 100) + "%";
+    m.textContent = c.kind;
+    return m;
+  }));
+
+  $("#kinds").replaceChildren(...KINDS.map(({ k, label, hint }) => {
+    const b = document.createElement("button");
+    b.className = "kind";
+    b.setAttribute("aria-pressed", String(state.kind === k));
+    const sw = document.createElement("span");
+    sw.className = "sw k" + k;
+    sw.style.background = `var(--k${k})`;
+    sw.textContent = k;
+    const t = document.createElement("span");
+    t.textContent = label;
+    const sm = document.createElement("small");
+    sm.textContent = hint;
+    t.appendChild(sm);
+    const n = document.createElement("span");
+    n.className = "n";
+    n.textContent = here.filter((c) => c.kind === k).length;
+    b.append(sw, t, n);
+    b.onclick = () => { state.kind = k; render(); };
+    return b;
+  }));
+
+  $("#dots").replaceChildren(...WINDOWS.map((x, j) => {
+    const b = document.createElement("button");
+    b.textContent = j + 1;
+    b.title = state.done.has(x.id) ? `Window ${j + 1}: done` : `Window ${j + 1}`;
+    if (state.done.has(x.id)) b.classList.add("done");
+    if (j === state.i) b.classList.add("current");
+    b.onclick = () => show(j);
+    return b;
+  }));
+
+  const isDone = state.done.has(w.id);
+  $("#done").textContent = isDone ? "Window done (click to reopen)" : "Window done, next";
+  $("#done").classList.toggle("is-done", isDone);
+  $("#undo").disabled = here.length === 0;
+  $("#download").disabled = !state.reviewer.trim();
+  $("#download").title = state.reviewer.trim() ? "" : "Enter your initials first";
+}
+
+stage.addEventListener("click", (e) => {
+  if (!$("#loading").hidden) return;
+  const r = stage.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  if (x < 0 || x > 1 || y < 0 || y > 1) return;
+  addClick(x, y);
+});
+$("#reviewer").addEventListener("input", (e) => { state.reviewer = e.target.value.trim(); save(); render(); });
+$("#prev").onclick = () => show(state.i - 1);
+$("#next").onclick = () => show(state.i + 1);
+$("#toggle").onclick = () => { state.outlines = !state.outlines; render(); };
+$("#undo").onclick = undo;
+$("#done").onclick = toggleDone;
+$("#download").onclick = () => {
+  const name = `fiber_outline_check_${state.reviewer.replace(/[^A-Za-z0-9_-]/g, "") || "reviewer"}_${new Date().toISOString().slice(0, 10)}.json`;
+  const url = URL.createObjectURL(new Blob([JSON.stringify(results(), null, 1)], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  $("#exportNote").textContent = `Saved as ${name} in your Downloads folder.`;
+};
+$("#copy").onclick = async () => {
+  const text = JSON.stringify(results());
+  try { await navigator.clipboard.writeText(text); $("#exportNote").textContent = "Copied. Paste it into a message to send it."; }
+  catch (e) { const t = $("#exportText"); t.hidden = false; t.value = text; t.select(); $("#exportNote").textContent = "Selected: copy with Cmd+C."; }
+};
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest && e.target.closest("input, textarea")) return;
+  if (["1", "2", "3", "4"].includes(e.key)) { state.kind = +e.key; render(); }
+  else if (e.key === "o" || e.key === "O") { state.outlines = !state.outlines; render(); }
+  else if (e.key === " ") { e.preventDefault(); if (!state.peek) { state.peek = true; render(); } }
+  else if (e.key === "z" || e.key === "Z") undo();
+  else if (e.key === "ArrowLeft") show(state.i - 1);
+  else if (e.key === "ArrowRight") show(state.i + 1);
+  else if (e.key === "d" || e.key === "D") toggleDone();
+});
+document.addEventListener("keyup", (e) => { if (e.key === " ") { state.peek = false; render(); } });
+window.addEventListener("resize", () => render());
+
+load();
+$("#reviewer").value = state.reviewer;
+show(0);
+</script>
+</body>
+</html>

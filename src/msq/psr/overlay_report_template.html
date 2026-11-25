@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><!--TITLE--></title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<!--ASSET base.css-->
+<style>
+/* Layout: dark lightbox stage for the section or window, tool rail beside it (stacks under it on phones). */
+:root {
+  color-scheme: dark;
+  --page: #17181b; --surface: #202226; --border: #34373d; --ink: #e9e7e2; --muted: #a3a29c; --accent: #00e5ff;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+html, body { height: 100%; }
+body { font: 15px/1.45 var(--font-body); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 28px; max-width: 1400px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: grid; gap: 4px; }
+h1 { font-size: 1.35rem; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 0.9rem; max-width: 75ch; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+.stage { position: relative; background: #fff; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; max-width: 100%; }
+.stage img { display: block; width: 100%; height: auto; }
+.stage img.layer { position: absolute; inset: 0; height: 100%; image-rendering: pixelated; pointer-events: none; }
+.stage img.layer[hidden] { display: none !important; }
+.box { position: absolute; border: 2px solid #111; box-shadow: 0 0 0 1px #fff; cursor: pointer; }
+.box span { position: absolute; left: 4px; top: 2px; font: 700 13px/1 var(--font-mono); color: #111; background: #fff; padding: 2px 4px; border-radius: 3px; }
+.scale { position: absolute; left: 12px; bottom: 12px; display: grid; gap: 3px; font: 600 11px/1 var(--font-mono); color: #111; pointer-events: none; }
+.scale i { display: block; height: 5px; background: #111; box-shadow: 0 0 0 1px rgba(255,255,255,.8); }
+aside { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px; display: grid; gap: 16px; position: sticky; top: env(safe-area-inset-top, 0px); }
+@media (max-width: 900px) { aside { position: static; } }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+button { font: inherit; color: var(--ink); background: #2a2d32; border: 1px solid var(--border); border-radius: 5px; padding: 6px 9px; cursor: pointer; text-align: left; }
+button:hover { background: #33373d; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.views { display: grid; gap: 4px; }
+.views .group { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+.views button[aria-current="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, #2a2d32); }
+.layers { display: grid; gap: 6px; }
+.layers label { display: grid; grid-template-columns: auto 18px 1fr auto; gap: 8px; align-items: center; cursor: pointer; }
+.layers .sw { width: 16px; height: 16px; border-radius: 3px; box-shadow: 0 0 0 1px rgba(255,255,255,.35); }
+kbd { font: 600 0.72rem/1 var(--font-mono); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 2px 5px; color: var(--muted); }
+.stats { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 0.9rem; }
+.stats .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.stats .key { font-weight: 700; }
+.note { font-size: 0.82rem; color: var(--muted); margin: 1em 0; max-width: none; }
+input[type=range] { width: 100%; }
+details summary { cursor: pointer; color: var(--muted); }
+details p { font-size: 0.86rem; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><!--TITLE--></h1>
+    <div class="sub"><!--SUBTITLE--></div>
+  </header>
+  <main>
+    <div class="stage" id="stage">
+      <img id="base" alt="Stained tissue">
+      <div id="layerStack"></div>
+      <div id="boxes"></div>
+      <div class="scale" id="scale" hidden><i id="scalebar"></i><span>50 µm</span></div>
+    </div>
+    <aside>
+      <section>
+        <div class="label">View</div>
+        <div class="views" id="views"></div>
+      </section>
+      <section>
+        <div class="label">Layers</div>
+        <div class="layers" id="layers"></div>
+        <div style="margin-top:10px"><label class="note" for="opacity">Layer opacity</label><input type="range" id="opacity" min="0.2" max="1" step="0.05" value="0.85"></div>
+        <p class="note">Hold <kbd>Space</kbd> to hide all layers. <kbd>←</kbd><kbd>→</kbd> change view.</p>
+      </section>
+      <section>
+        <div class="label">This view, share of red + yellow</div>
+        <div class="stats" id="stats"></div>
+      </section>
+      <details open>
+        <summary>What the readout counts</summary>
+        <p><b>Collagen outside the fibers</b> = red pixels in the main section that lie in no fiber outline, divided by all red + yellow pixels in the main section.</p>
+        <p>Blue is what is counted: endomysium, perimysium, epimysium, tendon, nerve and vessel walls. Green is red that falls inside an outline and is not counted, mostly where an outline edge overlaps the septum next to it.</p>
+        <p>Unstained areas (glass, holes from freezing artifacts, tears) are left out of both numbers. Colour classes follow the rule of Hildyard et al.</p>
+      </details>
+    </aside>
+  </main>
+</div>
+<!--ASSET base.js-->
+<script>
+const DATA = /*DATA*/null;
+const VIEWS = DATA.views, LAYERS = DATA.layers;
+const state = { i: 0, on: Object.fromEntries(LAYERS.map((l) => [l.id, l.id !== "unstained"])), opacity: 0.85, peek: false };
+
+function pct(x) { return (100 * x).toFixed(1) + "%"; }
+
+function buildViews() {
+  const box = $("#views");
+  let lastGroup = "";
+  VIEWS.forEach((v, i) => {
+    const group = v.title.split(":")[0];
+    if (group !== lastGroup) {
+      const g = document.createElement("div");
+      g.className = "group";
+      g.textContent = group;
+      box.appendChild(g);
+      lastGroup = group;
+    }
+    const b = document.createElement("button");
+    b.textContent = v.title.split(":")[1].trim();
+    b.onclick = () => show(i);
+    b.dataset.i = i;
+    box.appendChild(b);
+  });
+}
+
+function buildLayers() {
+  $("#layers").replaceChildren(...LAYERS.map((l, j) => {
+    const lab = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.id = "layer-" + l.id;
+    cb.checked = state.on[l.id];
+    cb.onchange = () => { state.on[l.id] = cb.checked; render(); };
+    const sw = document.createElement("span");
+    sw.className = "sw";
+    sw.style.background = `rgba(${l.rgba[0]},${l.rgba[1]},${l.rgba[2]},${l.rgba[3] / 255})`;
+    const t = document.createElement("span");
+    t.textContent = l.label;
+    const k = document.createElement("kbd");
+    k.textContent = j + 1;
+    lab.append(cb, sw, t, k);
+    return lab;
+  }));
+}
+
+function show(i) {
+  state.i = (i + VIEWS.length) % VIEWS.length;
+  const v = VIEWS[state.i];
+  $("#base").src = v.base;
+  $("#layerStack").replaceChildren(...LAYERS.map((l) => {
+    const img = document.createElement("img");
+    img.className = "layer";
+    img.id = "img-" + l.id;
+    img.alt = "";
+    img.src = v.layers[l.id];
+    return img;
+  }));
+  $("#boxes").replaceChildren(...v.boxes.map((b) => {
+    const d = document.createElement("div");
+    d.className = "box";
+    Object.assign(d.style, { left: 100 * b.x + "%", top: 100 * b.y + "%", width: 100 * b.w + "%", height: 100 * b.h + "%" });
+    const s = document.createElement("span");
+    s.textContent = b.label;
+    d.appendChild(s);
+    const target = VIEWS.findIndex((w) => w.title === v.title.split(":")[0] + ": window " + b.label);
+    if (target >= 0) d.onclick = () => show(target);
+    d.title = "Open window " + b.label;
+    return d;
+  }));
+  const st = v.stats;
+  const rows = v.rows || [["Collagen outside the fibers", pct(st.collagen_outside), true], ["Red inside outlines (not counted)", pct(st.red_inside)],
+                ["All red (Hildyard)", pct(st.red_total)], [v.kind === "overview" ? "Outlines in the section" : "Outlines in this window", st.fibers.toLocaleString()]];
+  $("#stats").replaceChildren(...rows.flatMap(([k, val, key]) => {
+    const a = document.createElement("span"); a.textContent = k; if (key) a.className = "key";
+    const b = document.createElement("span"); b.textContent = val; b.className = "v" + (key ? " key" : "");
+    return [a, b];
+  }));
+  document.querySelectorAll(".views button").forEach((b) => b.setAttribute("aria-current", String(+b.dataset.i === state.i)));
+  render();
+}
+
+function render() {
+  const v = VIEWS[state.i];
+  LAYERS.forEach((l) => {
+    const img = $("#img-" + l.id);
+    if (!img) return;
+    img.hidden = !state.on[l.id] || state.peek;
+    img.style.opacity = state.opacity;
+    const cb = $("#layer-" + l.id);
+    if (cb) cb.checked = state.on[l.id];
+  });
+  const scale = $("#scale");
+  scale.hidden = v.kind !== "window";
+  if (v.kind === "window") $("#scalebar").style.width = (50 / v.size_um * $("#stage").clientWidth) + "px";
+}
+
+$("#opacity").oninput = (e) => { state.opacity = +e.target.value; render(); };
+document.addEventListener("keydown", (e) => {
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= LAYERS.length) { const id = LAYERS[n - 1].id; state.on[id] = !state.on[id]; render(); }
+  else if (e.key === " ") { e.preventDefault(); if (!state.peek) { state.peek = true; render(); } }
+  else if (e.key === "ArrowRight") show(state.i + 1);
+  else if (e.key === "ArrowLeft") show(state.i - 1);
+});
+document.addEventListener("keyup", (e) => { if (e.key === " ") { state.peek = false; render(); } });
+window.addEventListener("resize", render);
+
+buildViews();
+buildLayers();
+show(0);
+</script>
+</body>
+</html>

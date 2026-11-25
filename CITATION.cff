@@ -1,13 +1,14 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 title: "muscle-section-quant"
-abstract: "Whole-section quantification of mouse muscle histology from Nikon ND2 scans: dystrophin per fiber, called against a threshold set on the untreated controls."
+abstract: "Whole-section quantification of mouse muscle histology from Nikon ND2 scans: dystrophin per fiber, called against a threshold set on the untreated controls, and picrosirius red fibrosis (collagen outside the fiber outlines)."
 type: software
 authors:
   - family-names: "Förtsch"
     given-names: "Arion"
     affiliation: "ETH Zurich"
-version: "0.1.0"
+version: "0.2.0"
+date-released: "2026-11-25"
 license: MIT
 repository-code: "https://github.com/foertsch/muscle-section-quant"
 keywords:
@@ -16,3 +17,6 @@ keywords:
   - muscle
   - duchenne
   - histology
+  - picrosirius red
+  - fibrosis
+  - collagen
